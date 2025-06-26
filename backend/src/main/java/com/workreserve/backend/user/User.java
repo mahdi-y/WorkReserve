@@ -31,10 +31,6 @@ public class User implements UserDetails {
     private boolean enabled = true;
     private boolean locked = false;
 
-    public User() {
-        this.role = Role.USER;
-    }
-
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -64,7 +60,6 @@ public class User implements UserDetails {
     public boolean isLocked() { return locked; }
     public void setLocked(boolean locked) { this.locked = locked; }
 
-    // UserDetails interface methods
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.name()));

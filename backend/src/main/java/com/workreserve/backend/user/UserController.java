@@ -45,6 +45,7 @@ public class UserController {
         User user = new User();
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
+        user.setRole(Role.USER);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
         String token = jwtService.generateToken(user.getEmail());

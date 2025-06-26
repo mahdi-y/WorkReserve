@@ -33,5 +33,5 @@ build/
 .vscode/
 
 ### Project files ###
-/backend/src/main/resources/application-secrets.properties
-/backend/src/main/java/com/workreserve/backend/config/todo.java
+src/main/resources/application-secrets.properties
+src/main/java/com/workreserve/backend/config/todo.java
