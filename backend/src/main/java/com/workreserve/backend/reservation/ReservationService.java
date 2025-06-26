@@ -1,0 +1,144 @@
+package com.workreserve.backend.reservation;
+
+import com.workreserve.backend.reservation.DTO.ReservationRequest;
+import com.workreserve.backend.reservation.DTO.ReservationResponse;
+import com.workreserve.backend.timeslot.TimeSlot;
+import com.workreserve.backend.timeslot.TimeSlotRepository;
+import com.workreserve.backend.user.User;
+import com.workreserve.backend.user.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class ReservationService {
+
+    @Autowired
+    private ReservationRepository reservationRepository;
+    @Autowired
+    private TimeSlotRepository timeSlotRepository;
+    @Autowired
+    private UserRepository userRepository;
+
+    public List<ReservationResponse> getAllReservations() {
+        return reservationRepository.findAll().stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<ReservationResponse> getUserReservations(Long userId) {
+        return reservationRepository.findByUserId(userId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    public ReservationResponse getReservationById(Long id) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+        return toResponse(reservation);
+    }
+
+    public ReservationResponse createReservation(ReservationRequest request) {
+        
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        
+        TimeSlot slot = timeSlotRepository.findById(request.getSlotId())
+                .orElseThrow(() -> new RuntimeException("Time slot not found"));
+
+        
+        if (reservationRepository.existsBySlotIdAndStatusNot(slot.getId(), ReservationStatus.CANCELLED)) {
+            throw new RuntimeException("Time slot already reserved");
+        }
+
+        
+        if (reservationRepository.findByUserIdAndSlotId(user.getId(), slot.getId()).isPresent()) {
+            throw new RuntimeException("You already have a reservation for this slot");
+        }
+
+        
+        if (request.getTeamSize() > slot.getRoom().getCapacity()) {
+            throw new RuntimeException("Team size exceeds room capacity");
+        }
+
+        
+        double totalCost = slot.getRoom().getPricePerHour() *
+                (slot.getEndTime().toSecondOfDay() - slot.getStartTime().toSecondOfDay()) / 3600.0;
+
+        Reservation reservation = new Reservation();
+        reservation.setUser(user);
+        reservation.setSlot(slot);
+        reservation.setTeamSize(request.getTeamSize());
+        reservation.setTotalCost(totalCost);
+        reservation.setStatus(ReservationStatus.PENDING);
+
+        Reservation saved = reservationRepository.save(reservation);
+        return toResponse(saved);
+    }
+
+    public ReservationResponse updateReservation(Long id, ReservationRequest request) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+
+        
+        if (reservation.getStatus() == ReservationStatus.CANCELLED ||
+            reservation.getStatus() == ReservationStatus.COMPLETED) {
+            throw new RuntimeException("Cannot update a cancelled or completed reservation");
+        }
+
+        
+        if (!reservation.getSlot().getId().equals(request.getSlotId())) {
+            TimeSlot slot = timeSlotRepository.findById(request.getSlotId())
+                    .orElseThrow(() -> new RuntimeException("Time slot not found"));
+            if (reservationRepository.existsBySlotIdAndStatusNot(slot.getId(), ReservationStatus.CANCELLED)) {
+                throw new RuntimeException("Time slot already reserved");
+            }
+            reservation.setSlot(slot);
+        }
+
+        if (request.getTeamSize() > reservation.getSlot().getRoom().getCapacity()) {
+            throw new RuntimeException("Team size exceeds room capacity");
+        }
+        reservation.setTeamSize(request.getTeamSize());
+
+        
+        double totalCost = reservation.getSlot().getRoom().getPricePerHour() *
+                (reservation.getSlot().getEndTime().toSecondOfDay() - reservation.getSlot().getStartTime().toSecondOfDay()) / 3600.0;
+        reservation.setTotalCost(totalCost);
+
+        Reservation updated = reservationRepository.save(reservation);
+        return toResponse(updated);
+    }
+
+    public void cancelReservation(Long id) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        reservationRepository.save(reservation);
+    }
+
+    
+    public ReservationResponse updateStatus(Long id, ReservationStatus status) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+        reservation.setStatus(status);
+        return toResponse(reservationRepository.save(reservation));
+    }
+
+    private ReservationResponse toResponse(Reservation reservation) {
+        ReservationResponse response = new ReservationResponse();
+        response.setId(reservation.getId());
+        response.setSlotId(reservation.getSlot().getId());
+        response.setUserId(reservation.getUser().getId());
+        response.setTeamSize(reservation.getTeamSize());
+        response.setTotalCost(reservation.getTotalCost());
+        response.setStatus(reservation.getStatus());
+        response.setCreatedAt(reservation.getCreatedAt());
+        return response;
+    }
+}

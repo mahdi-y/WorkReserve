@@ -1,8 +1,11 @@
 package com.workreserve.backend.reservation;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+import java.util.Optional;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
-        boolean existsBySlotIdAndStatusNot(Long slotId, ReservationStatus status);
-
+    List<Reservation> findByUserId(Long userId);
+    boolean existsBySlotIdAndStatusNot(Long slotId, ReservationStatus status);
+    Optional<Reservation> findByUserIdAndSlotId(Long userId, Long slotId);
 }

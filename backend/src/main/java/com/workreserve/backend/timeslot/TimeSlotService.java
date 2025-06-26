@@ -62,17 +62,17 @@ public class TimeSlotService {
     }
 
     public TimeSlotResponse createTimeSlot(TimeSlotRequest request) {
-        // Validate time logic
+        
         if (request.getStartTime().isAfter(request.getEndTime()) || 
             request.getStartTime().equals(request.getEndTime())) {
             throw new RuntimeException("Start time must be before end time");
         }
 
-        // Check if room exists
+        
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
-        // Check for conflicts
+        
         List<TimeSlot> conflicts = timeSlotRepository.findConflictingTimeSlots(
                 request.getRoomId(), 
                 request.getDate(), 
@@ -98,17 +98,17 @@ public class TimeSlotService {
         TimeSlot timeSlot = timeSlotRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Time slot not found"));
 
-        // Validate time logic
+        
         if (request.getStartTime().isAfter(request.getEndTime()) || 
             request.getStartTime().equals(request.getEndTime())) {
             throw new RuntimeException("Start time must be before end time");
         }
 
-        // Check if room exists
+        
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
-        // Check for conflicts (excluding current slot)
+        
         List<TimeSlot> conflicts = timeSlotRepository.findConflictingTimeSlots(
                 request.getRoomId(), 
                 request.getDate(), 
@@ -134,7 +134,7 @@ public class TimeSlotService {
         TimeSlot timeSlot = timeSlotRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Time slot not found"));
         
-        // Check if there are active reservations
+        
         boolean hasActiveReservations = reservationRepository.existsBySlotIdAndStatusNot(
                 id, com.workreserve.backend.reservation.ReservationStatus.CANCELLED);
         
