@@ -2,6 +2,8 @@ package com.workreserve.backend.room;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,7 +24,7 @@ public class RoomService {
 
     public RoomResponse getRoomById(Long id) {
         Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
         return toResponse(room);
     }
 
@@ -38,7 +40,7 @@ public class RoomService {
 
     public RoomResponse updateRoom(Long id, RoomRequest request) {
         Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
         room.setName(request.getName());
         room.setType(request.getType());
         room.setPricePerHour(request.getPricePerHour());
@@ -47,6 +49,9 @@ public class RoomService {
     }
 
     public void deleteRoom(Long id) {
+        if (!roomRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found");
+        }
         roomRepository.deleteById(id);
     }
 

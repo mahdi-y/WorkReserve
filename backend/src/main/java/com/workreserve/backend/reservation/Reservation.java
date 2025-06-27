@@ -60,4 +60,5 @@ public class Reservation {
     public void setStatus(ReservationStatus status) { this.status = status; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

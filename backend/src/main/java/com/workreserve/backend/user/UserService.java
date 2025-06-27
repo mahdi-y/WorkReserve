@@ -5,7 +5,6 @@ import com.workreserve.backend.user.DTO.AuthResponse;
 import com.workreserve.backend.user.DTO.LoginRequest;
 import com.workreserve.backend.user.DTO.RegisterRequest;
 import com.workreserve.backend.user.DTO.UserResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -27,7 +26,6 @@ public class UserService implements UserDetailsService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
-    @Autowired
     public UserService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
