@@ -1,6 +1,7 @@
 package com.workreserve.backend.user.DTO;
 
 public class AuthResponse {
+    
     private String token;
 
     public AuthResponse(String token) {

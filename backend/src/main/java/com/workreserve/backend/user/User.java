@@ -30,6 +30,18 @@ public class User implements UserDetails {
 
     private boolean enabled = true;
     private boolean locked = false;
+    private boolean emailVerified = false;
+    private String verificationToken;
+    private LocalDateTime verificationTokenCreatedAt;
+    private String resetPasswordToken;
+    private LocalDateTime resetPasswordTokenCreatedAt;
+    private int failedLoginAttempts = 0;
+    private LocalDateTime accountLockedAt;
+    private String unlockToken;
+    private LocalDateTime unlockTokenCreatedAt;
+    private String refreshToken;
+    private LocalDateTime refreshTokenExpiry;
+
 
     @PrePersist
     protected void onCreate() {
@@ -59,6 +71,35 @@ public class User implements UserDetails {
 
     public boolean isLocked() { return locked; }
     public void setLocked(boolean locked) { this.locked = locked; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+    public String getVerificationToken() { return verificationToken; }
+    public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
+
+    public LocalDateTime getVerificationTokenCreatedAt() { return verificationTokenCreatedAt; }
+    public void setVerificationTokenCreatedAt(LocalDateTime verificationTokenCreatedAt) { this.verificationTokenCreatedAt = verificationTokenCreatedAt; }
+
+    public String getResetPasswordToken() { return resetPasswordToken; }
+    public void setResetPasswordToken(String resetPasswordToken) { this.resetPasswordToken = resetPasswordToken; }
+    public LocalDateTime getResetPasswordTokenCreatedAt() { return resetPasswordTokenCreatedAt; }
+    public void setResetPasswordTokenCreatedAt(LocalDateTime resetPasswordTokenCreatedAt) { this.resetPasswordTokenCreatedAt = resetPasswordTokenCreatedAt; }
+
+    public int getFailedLoginAttempts() { return failedLoginAttempts; }
+    public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+    public LocalDateTime getAccountLockedAt() { return accountLockedAt; }
+    public void setAccountLockedAt(LocalDateTime accountLockedAt) { this.accountLockedAt = accountLockedAt; }
+
+    public String getUnlockToken() { return unlockToken; }
+    public void setUnlockToken(String unlockToken) { this.unlockToken = unlockToken; }
+    public LocalDateTime getUnlockTokenCreatedAt() { return unlockTokenCreatedAt; }
+    public void setUnlockTokenCreatedAt(LocalDateTime unlockTokenCreatedAt) { this.unlockTokenCreatedAt = unlockTokenCreatedAt; }
+
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
+    public LocalDateTime getRefreshTokenExpiry() { return refreshTokenExpiry; }
+    public void setRefreshTokenExpiry(LocalDateTime refreshTokenExpiry) { this.refreshTokenExpiry = refreshTokenExpiry; }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

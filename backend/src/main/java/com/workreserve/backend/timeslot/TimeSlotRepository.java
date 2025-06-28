@@ -28,4 +28,20 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
     List<TimeSlot> findByRoomId(Long roomId);
     
     List<TimeSlot> findByDateGreaterThanEqualOrderByDateAscStartTimeAsc(LocalDate date);
+
+    @Query("""
+        SELECT DISTINCT ts.room FROM TimeSlot ts
+        WHERE ts.date = :date
+          AND ts.startTime <= :startTime
+          AND ts.endTime >= :endTime
+          AND NOT EXISTS (
+            SELECT r FROM Reservation r
+            WHERE r.slot = ts AND r.status != 'CANCELLED'
+          )
+    """)
+    List<com.workreserve.backend.room.Room> findAvailableRooms(
+        @Param("date") LocalDate date,
+        @Param("startTime") LocalTime startTime,
+        @Param("endTime") LocalTime endTime
+    );
 }

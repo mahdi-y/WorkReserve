@@ -23,6 +23,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int RATE_LIMIT = 5;
     private static final Duration DURATION = Duration.ofMinutes(1);
 
+    @SuppressWarnings("deprecation")
     private Bucket resolveBucket(String ip) {
         return buckets.computeIfAbsent(ip, k -> Bucket.builder()
                 .addLimit(Bandwidth.simple(RATE_LIMIT, DURATION))
