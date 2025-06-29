@@ -40,20 +40,23 @@ class TimeSlotControllerIT {
     @Autowired
     private ReservationRepository reservationRepository;
 
+    private Long testRoomId;
+
     @BeforeEach
     void setupRoom() {
         reservationRepository.deleteAll();
         timeSlotRepository.deleteAll();
-        if (!roomRepository.existsById(1L)) {
-            Room room = new Room();
-            room.setId(1L);
-            room.setName("Test Room");
-            room.setType(RoomType.HOT_DESK);
-            room.setPricePerHour(10.0);
-            room.setCapacity(2);
-            roomRepository.save(room);
+        roomRepository.deleteAll();
+        
+        // Always create a fresh room and capture its actual ID
+        Room room = new Room();
+        room.setName("Test Room");
+        room.setType(RoomType.HOT_DESK);
+        room.setPricePerHour(10.0);
+        room.setCapacity(2);
+        Room savedRoom = roomRepository.save(room);
+        testRoomId = savedRoom.getId();  // Use the actual generated ID
     }
-}
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -62,7 +65,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(1));
         req.setStartTime(LocalTime.of(9, 0));
         req.setEndTime(LocalTime.of(10, 0));
-        req.setRoomId(1L); 
+        req.setRoomId(testRoomId); 
 
         mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +88,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(2));
         req.setStartTime(LocalTime.of(11, 0));
         req.setEndTime(LocalTime.of(12, 0));
-        req.setRoomId(1L);
+        req.setRoomId(testRoomId);
 
         String response = mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -108,7 +111,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(3));
         req.setStartTime(LocalTime.of(13, 0));
         req.setEndTime(LocalTime.of(14, 0));
-        req.setRoomId(1L);
+        req.setRoomId(testRoomId);
 
         String response = mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -138,7 +141,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(4));
         req.setStartTime(LocalTime.of(17, 0));
         req.setEndTime(LocalTime.of(18, 0));
-        req.setRoomId(1L);
+        req.setRoomId(testRoomId);
 
         String response = mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -158,7 +161,7 @@ class TimeSlotControllerIT {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getTimeSlotsByRoom_shouldReturnOk() throws Exception {
-        mockMvc.perform(get("/api/timeslots/room/1"))
+        mockMvc.perform(get("/api/timeslots/room/" + testRoomId))
                 .andExpect(status().isOk());
     }
 
@@ -207,7 +210,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(1));
         req.setStartTime(LocalTime.of(11, 0));
         req.setEndTime(LocalTime.of(10, 0)); 
-        req.setRoomId(1L);
+        req.setRoomId(testRoomId);
 
         mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -224,7 +227,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(5));
         req.setStartTime(LocalTime.of(9, 0));
         req.setEndTime(LocalTime.of(10, 0));
-        req.setRoomId(1L);
+        req.setRoomId(testRoomId);
 
         mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -236,7 +239,7 @@ class TimeSlotControllerIT {
         conflict.setDate(req.getDate());
         conflict.setStartTime(LocalTime.of(9, 30));
         conflict.setEndTime(LocalTime.of(10, 30));
-        conflict.setRoomId(1L);
+        conflict.setRoomId(testRoomId);
 
         mockMvc.perform(post("/api/timeslots")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -260,7 +263,7 @@ class TimeSlotControllerIT {
         req.setDate(LocalDate.now().plusDays(1));
         req.setStartTime(LocalTime.of(9, 0));
         req.setEndTime(LocalTime.of(10, 0));
-        req.setRoomId(1L);
+        req.setRoomId(testRoomId);
 
         mockMvc.perform(put("/api/timeslots/99999")
                 .contentType(MediaType.APPLICATION_JSON)

@@ -42,8 +42,10 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(UserException.class)
-    public ResponseEntity<String> handleUserException(UserException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    public ResponseEntity<Map<String, String>> handleUserException(UserException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", ex.getMessage());
+        return ResponseEntity.badRequest().body(error);
     }
 
     @ExceptionHandler(TokenExpiredException.class)

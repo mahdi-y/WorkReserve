@@ -33,6 +33,7 @@ public class UserService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final String exposedLink = "http://localhost:8082/api/auth/unlock?email=" ;
 
     @Autowired
     private MailService emailService;
@@ -43,12 +44,14 @@ public class UserService implements UserDetailsService {
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
         JwtService jwtService,
-        @Lazy AuthenticationManager authenticationManager
+        @Lazy AuthenticationManager authenticationManager,
+        MailService emailService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.emailService = emailService;
     }
 
     @Override
@@ -182,7 +185,7 @@ public class UserService implements UserDetailsService {
     }
 
     private void sendVerificationEmail(String to, String token) {
-    String link = "http://localhost:8081/api/auth/verify?token=" + token;
+    String link = exposedLink + token;
     String subject = "Verify your email";
     String text = "Welcome! Please verify your email by clicking the link: " + link;
 
@@ -261,7 +264,7 @@ public class UserService implements UserDetailsService {
         user.setResetPasswordTokenCreatedAt(LocalDateTime.now());
         userRepository.save(user);
 
-        String link = "http://localhost:8081/api/auth/reset-password?token=" + token;
+        String link = exposedLink + token;
         String subject = "Password Reset Request";
         String text = "To reset your password, click the link: " + link;
         emailService.sendEmail(user.getEmail(), subject, text);
@@ -285,7 +288,7 @@ public class UserService implements UserDetailsService {
     }
 
     private void sendUnlockEmail(String to, String unlockToken) {
-        String link = "http://localhost:8081/api/auth/unlock?email=" + to + "&token=" + unlockToken;
+        String link = exposedLink + to + "&token=" + unlockToken;
         String subject = "Unlock your account";
         String text = "Your account has been locked due to too many failed login attempts. Click here to unlock: " + link;
         emailService.sendEmail(to, subject, text);

@@ -46,6 +46,7 @@ public class RoomService {
         room.setType(request.getType());
         room.setPricePerHour(request.getPricePerHour());
         room.setCapacity(request.getCapacity());
+        room.setDescription(request.getDescription());
         Room saved = roomRepository.save(room);
         return toResponse(saved);
     }
@@ -65,6 +66,7 @@ public class RoomService {
         room.setType(request.getType());
         room.setPricePerHour(request.getPricePerHour());
         room.setCapacity(request.getCapacity());
+        room.setDescription(request.getDescription());
         return toResponse(roomRepository.save(room));
     }
 
@@ -87,6 +89,7 @@ public class RoomService {
         res.setType(room.getType());
         res.setPricePerHour(room.getPricePerHour());
         res.setCapacity(room.getCapacity());
+        res.setDescription(room.getDescription());
         return res;
     }
 }

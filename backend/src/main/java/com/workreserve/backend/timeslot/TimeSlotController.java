@@ -1,5 +1,6 @@
 package com.workreserve.backend.timeslot;
 
+import com.workreserve.backend.timeslot.DTO.BulkTimeSlotRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotResponse;
 import jakarta.validation.Valid;
@@ -52,6 +53,12 @@ public class TimeSlotController {
     @PostMapping
     public ResponseEntity<TimeSlotResponse> createTimeSlot(@Valid @RequestBody TimeSlotRequest request) {
         return ResponseEntity.ok(timeSlotService.createTimeSlot(request));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/bulk")
+    public List<TimeSlotResponse> createTimeSlotsBulk(@Valid @RequestBody BulkTimeSlotRequest request) {
+        return timeSlotService.createTimeSlotsBulk(request.getTimeSlots());
     }
 
     @PreAuthorize("hasRole('ADMIN')")

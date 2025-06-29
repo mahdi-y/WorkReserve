@@ -145,6 +145,12 @@ public class TimeSlotService {
         timeSlotRepository.deleteById(id);
     }
 
+    public List<TimeSlotResponse> createTimeSlotsBulk(List<TimeSlotRequest> requests) {
+        return requests.stream()
+            .map(this::createTimeSlot)
+            .collect(Collectors.toList());
+    }
+
     private TimeSlotResponse toResponse(TimeSlot timeSlot) {
         TimeSlotResponse response = new TimeSlotResponse();
         response.setId(timeSlot.getId());

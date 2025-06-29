@@ -1,6 +1,7 @@
 package com.workreserve.backend.user;
 
 import com.workreserve.backend.config.JwtService;
+import com.workreserve.backend.config.MailService;
 import com.workreserve.backend.user.DTO.RegisterRequest;
 import com.workreserve.backend.user.DTO.UserResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,8 @@ class UserServiceTest {
     private JwtService jwtService;
     @Mock
     private AuthenticationManager authenticationManager;
+    @Mock
+    private MailService emailService; // Add this line
 
     @InjectMocks
     private UserService userService;
