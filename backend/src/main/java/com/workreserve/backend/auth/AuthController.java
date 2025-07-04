@@ -1,31 +1,26 @@
 package com.workreserve.backend.auth;
 
 import com.workreserve.backend.user.UserService;
-import com.workreserve.backend.user.DTO.AuthResponse;
-import com.workreserve.backend.user.DTO.AuthResponseToken;
-import com.workreserve.backend.user.DTO.ForgotPasswordRequest;
-import com.workreserve.backend.user.DTO.LoginRequest;
-import com.workreserve.backend.user.DTO.RegisterRequest;
-import com.workreserve.backend.user.DTO.ResetPasswordRequest;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
+import com.workreserve.backend.user.DTO.*;
+import com.workreserve.backend.exception.UserException; 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Authentication", description = "Authentication and user management endpoints")
 public class AuthController {
-    private final UserService userService;
 
-    public AuthController(UserService userService) {
-        this.userService = userService;
-    }
+    @Autowired
+    private UserService userService;
 
     @Operation(summary = "Register a new user", description = "Create a new user account with email verification")
     @ApiResponses(value = {
@@ -95,15 +90,28 @@ public class AuthController {
         return ResponseEntity.ok("Password has been reset successfully.");
     }
 
-    @Operation(summary = "Unlock user account", description = "Unlock a locked user account")
+    @Operation(summary = "Unlock account", description = "Unlock user account with email and token")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Account unlocked. You can now log in."),
-        @ApiResponse(responseCode = "400", description = "Invalid email or token")
+        @ApiResponse(responseCode = "200", description = "Account unlocked successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid unlock token or user not found")
     })
     @PostMapping("/unlock")
     public ResponseEntity<String> unlockAccount(@RequestParam String email, @RequestParam String token) {
-        userService.unlockAccount(email, token);
-        return ResponseEntity.ok("Account unlocked. You can now log in.");
+        try {
+            userService.unlockAccount(email, token);
+            return ResponseEntity.ok("Account unlocked successfully.");
+        } catch (UserException e) {
+            
+            if (e.getMessage().contains("Account is not locked") || 
+                e.getMessage().contains("already unlocked")) {
+                return ResponseEntity.ok("Account is already unlocked. You can log in normally.");
+            }
+            
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            
+            return ResponseEntity.internalServerError().body("An error occurred while unlocking the account.");
+        }
     }
 
     @Operation(summary = "Refresh access token", description = "Get new access and refresh tokens using refresh token")

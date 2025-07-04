@@ -36,7 +36,7 @@ public class UserService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final String exposedLink = "http://localhost:8082/api/auth/unlock?email=" ;
+    private final String frontendUrl = "http://localhost:3000"; 
 
     @Autowired
     private MailService emailService;
@@ -202,7 +202,7 @@ public class UserService implements UserDetailsService {
     }
 
     private void sendVerificationEmail(String to, String token) {
-    String link = exposedLink + token;
+    String link = frontendUrl + "/auth/verify?token=" + token; 
     String subject = "Verify your email";
     String text = "Welcome! Please verify your email by clicking the link: " + link;
 
@@ -281,7 +281,7 @@ public class UserService implements UserDetailsService {
         user.setResetPasswordTokenCreatedAt(LocalDateTime.now());
         userRepository.save(user);
 
-        String link = exposedLink + token;
+        String link = frontendUrl + "/auth/reset-password?token=" + token;
         String subject = "Password Reset Request";
         String text = "To reset your password, click the link: " + link;
         emailService.sendEmail(user.getEmail(), subject, text);
@@ -305,7 +305,7 @@ public class UserService implements UserDetailsService {
     }
 
     private void sendUnlockEmail(String to, String unlockToken) {
-        String link = exposedLink + to + "&token=" + unlockToken;
+        String link = frontendUrl + "/auth/unlock?email=" + to + "&token=" + unlockToken; // Changed to frontend URL
         String subject = "Unlock your account";
         String text = "Your account has been locked due to too many failed login attempts. Click here to unlock: " + link;
         emailService.sendEmail(to, subject, text);
