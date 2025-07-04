@@ -1,5 +1,8 @@
 package com.workreserve.backend.reservation;
 
+import com.workreserve.backend.exception.ResourceNotFoundException;
+import com.workreserve.backend.exception.ValidationException;
+import com.workreserve.backend.exception.ConflictException;
 import com.workreserve.backend.reservation.DTO.ReservationRequest;
 import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.timeslot.TimeSlot;
@@ -7,8 +10,12 @@ import com.workreserve.backend.timeslot.TimeSlotRepository;
 import com.workreserve.backend.user.User;
 import com.workreserve.backend.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,47 +30,52 @@ public class ReservationService {
     @Autowired
     private UserRepository userRepository;
 
+    @Cacheable("reservations")
     public List<ReservationResponse> getAllReservations() {
         return reservationRepository.findAll().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "user-reservations", key = "#userId")
     public List<ReservationResponse> getUserReservations(Long userId) {
-        return reservationRepository.findByUserId(userId).stream()
+        List<Reservation> reservations = reservationRepository.findByUserId(userId);
+        return reservations.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "reservations", key = "#id")
     public ReservationResponse getReservationById(Long id) {
         Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
         return toResponse(reservation);
     }
 
+    @CacheEvict(value = {"reservations", "user-reservations", "available-timeslots"}, allEntries = true)
     public ReservationResponse createReservation(ReservationRequest request) {
         
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         
         TimeSlot slot = timeSlotRepository.findById(request.getSlotId())
-                .orElseThrow(() -> new RuntimeException("Time slot not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found"));
 
         
         if (reservationRepository.existsBySlotIdAndStatusNot(slot.getId(), ReservationStatus.CANCELLED)) {
-            throw new RuntimeException("Time slot already reserved");
+            throw new ConflictException("Time slot already reserved");
         }
 
         
         if (reservationRepository.findByUserIdAndSlotId(user.getId(), slot.getId()).isPresent()) {
-            throw new RuntimeException("You already have a reservation for this slot");
+            throw new ConflictException("You already have a reservation for this slot");
         }
 
         
         if (request.getTeamSize() > slot.getRoom().getCapacity()) {
-            throw new RuntimeException("Team size exceeds room capacity");
+            throw new ValidationException("Team size exceeds room capacity");
         }
 
         
@@ -81,22 +93,23 @@ public class ReservationService {
         return toResponse(saved);
     }
 
+    @CacheEvict(value = {"reservations", "user-reservations", "available-timeslots"}, allEntries = true)
     public ReservationResponse updateReservation(Long id, ReservationRequest request) {
         Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
 
         
         if (reservation.getStatus() == ReservationStatus.CANCELLED ||
             reservation.getStatus() == ReservationStatus.COMPLETED) {
-            throw new RuntimeException("Cannot update a cancelled or completed reservation");
+            throw new ValidationException("Cannot update a cancelled or completed reservation");
         }
 
         
         if (!reservation.getSlot().getId().equals(request.getSlotId())) {
             TimeSlot slot = timeSlotRepository.findById(request.getSlotId())
-                    .orElseThrow(() -> new RuntimeException("Time slot not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Time slot not found"));
             if (reservationRepository.existsBySlotIdAndStatusNot(slot.getId(), ReservationStatus.CANCELLED)) {
-                throw new RuntimeException("Time slot already reserved");
+                throw new ConflictException("Time slot already reserved");
             }
             reservation.setSlot(slot);
         }
@@ -115,17 +128,18 @@ public class ReservationService {
         return toResponse(updated);
     }
 
+    @CacheEvict(value = {"reservations", "user-reservations", "available-timeslots"}, allEntries = true)
     public void cancelReservation(Long id) {
         Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservationRepository.save(reservation);
     }
 
-    
+    @CacheEvict(value = {"reservations", "user-reservations"}, allEntries = true)
     public ReservationResponse updateStatus(Long id, ReservationStatus status) {
         Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
         reservation.setStatus(status);
         return toResponse(reservationRepository.save(reservation));
     }

@@ -17,6 +17,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.workreserve.backend.exception.ResourceNotFoundException;
+import com.workreserve.backend.exception.ValidationException;
+import com.workreserve.backend.exception.ConflictException;
+
 class TimeSlotServiceTest {
 
     @Mock
@@ -62,7 +66,7 @@ class TimeSlotServiceTest {
     @Test
     void getTimeSlotById_notFound() {
         when(timeSlotRepository.findById(1L)).thenReturn(Optional.empty());
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.getTimeSlotById(1L));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> timeSlotService.getTimeSlotById(1L));
         assertEquals("Time slot not found", ex.getMessage());
     }
 
@@ -130,7 +134,7 @@ class TimeSlotServiceTest {
         request.setEndTime(LocalTime.of(9, 0)); 
         request.setRoomId(1L);
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.createTimeSlot(request));
+        ValidationException ex = assertThrows(ValidationException.class, () -> timeSlotService.createTimeSlot(request));
         assertEquals("Start time must be before end time", ex.getMessage());
     }
 
@@ -156,7 +160,7 @@ class TimeSlotServiceTest {
 
         when(roomRepository.findById(99L)).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.createTimeSlot(request));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> timeSlotService.createTimeSlot(request));
         assertEquals("Room not found", ex.getMessage());
     }
 
@@ -178,7 +182,7 @@ class TimeSlotServiceTest {
         when(timeSlotRepository.findConflictingTimeSlots(1L, request.getDate(), request.getStartTime(), request.getEndTime()))
                 .thenReturn(List.of(conflictingSlot));
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.createTimeSlot(request));
+        ConflictException ex = assertThrows(ConflictException.class, () -> timeSlotService.createTimeSlot(request));
         assertEquals("Time slot conflicts with existing slot", ex.getMessage());
     }
 
@@ -238,7 +242,7 @@ class TimeSlotServiceTest {
     void deleteTimeSlot_notFound() {
         when(timeSlotRepository.findById(1L)).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.deleteTimeSlot(1L));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> timeSlotService.deleteTimeSlot(1L));
         assertEquals("Time slot not found", ex.getMessage());
     }
 

@@ -5,6 +5,13 @@ import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.user.User;
 import com.workreserve.backend.user.UserRepository;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +22,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/reservations")
+@Tag(name = "Reservations", description = "Reservation management endpoints")
 public class ReservationController {
 
     @Autowired
@@ -23,12 +31,27 @@ public class ReservationController {
     @Autowired
     private UserRepository userRepository;
 
+    @Operation(summary = "Get all reservations", description = "Retrieve a list of all reservations (Admin only)")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "List of reservations retrieved successfully",
+                content = @Content(schema = @Schema(implementation = ReservationResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - Admin required")
+    })
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public List<ReservationResponse> getAllReservations() {
         return reservationService.getAllReservations();
     }
 
+    @Operation(summary = "Get user reservations", description = "Get all reservations for the current authenticated user")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User reservations retrieved successfully",
+                content = @Content(schema = @Schema(implementation = ReservationResponse.class))),
+        @ApiResponse(responseCode = "401", description = "User not authenticated"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
     @GetMapping("/user")
     public List<ReservationResponse> getUserReservations() {
         String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
@@ -37,27 +60,70 @@ public class ReservationController {
         return reservationService.getUserReservations(user.getId());
     }
 
+    @Operation(summary = "Get reservation by ID", description = "Retrieve a specific reservation by its ID")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Reservation found",
+                content = @Content(schema = @Schema(implementation = ReservationResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Reservation not found"),
+        @ApiResponse(responseCode = "403", description = "Access denied - can only view own reservations")
+    })
     @GetMapping("/{id}")
     public ResponseEntity<ReservationResponse> getReservationById(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.getReservationById(id));
     }
 
+    @Operation(summary = "Create reservation", description = "Create a new reservation for a time slot")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Reservation created successfully",
+                content = @Content(schema = @Schema(implementation = ReservationResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Validation error or time slot not available"),
+        @ApiResponse(responseCode = "404", description = "Time slot not found"),
+        @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
     @PostMapping
     public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody ReservationRequest request) {
         return ResponseEntity.ok(reservationService.createReservation(request));
     }
 
+    @Operation(summary = "Update reservation", description = "Update an existing reservation")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Reservation updated successfully",
+                content = @Content(schema = @Schema(implementation = ReservationResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Validation error or time slot not available"),
+        @ApiResponse(responseCode = "404", description = "Reservation not found"),
+        @ApiResponse(responseCode = "403", description = "Access denied - can only update own reservations")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<ReservationResponse> updateReservation(@PathVariable Long id, @Valid @RequestBody ReservationRequest request) {
         return ResponseEntity.ok(reservationService.updateReservation(id, request));
     }
 
+    @Operation(summary = "Cancel reservation", description = "Cancel a reservation by its ID")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "Reservation cancelled successfully"),
+        @ApiResponse(responseCode = "404", description = "Reservation not found"),
+        @ApiResponse(responseCode = "403", description = "Access denied - can only cancel own reservations"),
+        @ApiResponse(responseCode = "400", description = "Reservation cannot be cancelled")
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> cancelReservation(@PathVariable Long id) {
         reservationService.cancelReservation(id);
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Update reservation status", description = "Update the status of a reservation (Admin only)")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Reservation status updated successfully",
+                content = @Content(schema = @Schema(implementation = ReservationResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid status"),
+        @ApiResponse(responseCode = "404", description = "Reservation not found"),
+        @ApiResponse(responseCode = "403", description = "Access denied - Admin required")
+    })
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/status")
     public ResponseEntity<ReservationResponse> updateStatus(@PathVariable Long id, @RequestParam ReservationStatus status) {

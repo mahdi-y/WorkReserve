@@ -151,7 +151,7 @@ class AuthControllerIT {
         user.setRole(Role.USER);
         user.setEnabled(true);
         user.setEmailVerified(true);
-        user.setLocked(true); // Account is locked
+        user.setLocked(true); 
         userRepository.save(user);
 
         LoginRequest req = new LoginRequest();
@@ -167,7 +167,7 @@ class AuthControllerIT {
 
     @Test
     void refreshToken_shouldReturnNewTokens_whenValid() throws Exception {
-        // First, create and login a user to get a refresh token
+        
         User user = new User();
         user.setFullName("Refresh User");
         user.setEmail("refresh@example.com");
@@ -191,7 +191,7 @@ class AuthControllerIT {
 
         String refreshToken = objectMapper.readTree(loginResponse).get("refreshToken").asText();
 
-        // Now test the refresh endpoint
+        
         mockMvc.perform(post("/api/auth/refresh-token?refreshToken=" + refreshToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").exists())

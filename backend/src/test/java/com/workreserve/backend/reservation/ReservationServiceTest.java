@@ -23,6 +23,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.workreserve.backend.exception.ResourceNotFoundException;
+import com.workreserve.backend.exception.ValidationException;
+import com.workreserve.backend.exception.ConflictException;
+
 class ReservationServiceTest {
 
     @Mock
@@ -72,7 +76,7 @@ class ReservationServiceTest {
     @Test
     void getReservationById_notFound() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.empty());
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.getReservationById(1L));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> reservationService.getReservationById(1L));
         assertEquals("Reservation not found", ex.getMessage());
     }
 
@@ -126,7 +130,7 @@ class ReservationServiceTest {
 
         when(userRepository.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.createReservation(req));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> reservationService.createReservation(req));
         assertEquals("User not found", ex.getMessage());
     }
 
@@ -145,7 +149,7 @@ class ReservationServiceTest {
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         when(timeSlotRepository.findById(2L)).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.createReservation(req));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> reservationService.createReservation(req));
         assertEquals("Time slot not found", ex.getMessage());
     }
 
@@ -174,7 +178,7 @@ class ReservationServiceTest {
         when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(slot));
         when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(true);
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.createReservation(req));
+        ConflictException ex = assertThrows(ConflictException.class, () -> reservationService.createReservation(req));
         assertEquals("Time slot already reserved", ex.getMessage());
     }
 
@@ -234,7 +238,7 @@ class ReservationServiceTest {
         when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(false);
         when(reservationRepository.findByUserIdAndSlotId(1L, 2L)).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.createReservation(req));
+        ValidationException ex = assertThrows(ValidationException.class, () -> reservationService.createReservation(req));
         assertEquals("Team size exceeds room capacity", ex.getMessage());
     }
 

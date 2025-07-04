@@ -1,4 +1,4 @@
-package com.workreserve.backend.user.exception;
+package com.workreserve.backend.exception;
 
 public class TokenExpiredException extends RuntimeException {
     public TokenExpiredException(String message) {

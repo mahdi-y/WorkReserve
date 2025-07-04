@@ -16,10 +16,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import com.workreserve.backend.config.MailService;
-import com.workreserve.backend.user.exception.UserException;
-import com.workreserve.backend.user.exception.TokenExpiredException;
+import com.workreserve.backend.exception.TokenExpiredException;
+import com.workreserve.backend.exception.UserException;
+
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.workreserve.backend.user.DTO.ChangePasswordRequest;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,14 +63,24 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
     }
 
+    @Cacheable("users")
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(this::toUserResponse)
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "users", key = "#id")
     public UserResponse getUserById(Long id) {
         User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return toUserResponse(user);
+    }
+
+    @Cacheable(value = "current-user", key = "#email")
+    public UserResponse getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return toUserResponse(user);
     }
@@ -135,6 +148,7 @@ public class UserService implements UserDetailsService {
         return new AuthResponseToken(accessToken, refreshToken);
     }
 
+    @CacheEvict(value = {"users", "current-user"}, allEntries = true)
     public UserResponse updateUser(Long id, RegisterRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -157,6 +171,7 @@ public class UserService implements UserDetailsService {
         return toUserResponse(updatedUser);
     }
 
+    @CacheEvict(value = {"users", "current-user"}, allEntries = true)
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -164,6 +179,7 @@ public class UserService implements UserDetailsService {
         userRepository.delete(user);
     }
 
+    @CacheEvict(value = {"users", "current-user"}, allEntries = true)
     public UserResponse updateUserRole(Long id, Role role) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -174,6 +190,7 @@ public class UserService implements UserDetailsService {
         return toUserResponse(updatedUser);
     }
 
+    @CacheEvict(value = {"users", "current-user"}, allEntries = true)
     public UserResponse toggleUserStatus(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));

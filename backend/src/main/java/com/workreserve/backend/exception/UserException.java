@@ -1,4 +1,4 @@
-package com.workreserve.backend.user.exception;
+package com.workreserve.backend.exception;
 
 public class UserException extends RuntimeException {
     public UserException(String message) {

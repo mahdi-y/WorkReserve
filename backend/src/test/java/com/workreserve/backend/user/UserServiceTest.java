@@ -26,7 +26,7 @@ class UserServiceTest {
     @Mock
     private AuthenticationManager authenticationManager;
     @Mock
-    private MailService emailService; // Add this line
+    private MailService emailService; 
 
     @InjectMocks
     private UserService userService;

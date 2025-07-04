@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,18 +24,21 @@ public class RoomService {
     @Autowired
     private TimeSlotRepository timeSlotRepository;
 
+    @Cacheable("rooms")
     public List<RoomResponse> getAllRooms() {
         return roomRepository.findAll().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "rooms", key = "#id")
     public RoomResponse getRoomById(Long id) {
         Room room = roomRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
         return toResponse(room);
     }
 
+    @CacheEvict(value = "rooms", allEntries = true)
     public RoomResponse createRoom(RoomRequest request) {
         String normalizedName = request.getName().trim().toLowerCase();
         boolean exists = roomRepository.findAll().stream()
@@ -51,6 +56,7 @@ public class RoomService {
         return toResponse(saved);
     }
 
+    @CacheEvict(value = "rooms", allEntries = true)
     public RoomResponse updateRoom(Long id, RoomRequest request) {
         Room room = roomRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
@@ -70,6 +76,7 @@ public class RoomService {
         return toResponse(roomRepository.save(room));
     }
 
+    @CacheEvict(value = "rooms", allEntries = true)
     public void deleteRoom(Long id) {
         if (!roomRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found");

@@ -48,14 +48,14 @@ class TimeSlotControllerIT {
         timeSlotRepository.deleteAll();
         roomRepository.deleteAll();
         
-        // Always create a fresh room and capture its actual ID
+        
         Room room = new Room();
         room.setName("Test Room");
         room.setType(RoomType.HOT_DESK);
         room.setPricePerHour(10.0);
         room.setCapacity(2);
         Room savedRoom = roomRepository.save(room);
-        testRoomId = savedRoom.getId();  // Use the actual generated ID
+        testRoomId = savedRoom.getId();  
     }
 
     @Test
