@@ -1,0 +1,19 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "The secret key used to sign and verify JWT tokens."
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.String",
+      "description": "The duration after which a JWT token expires (e.g., 3600s, 1h)."
+    },
+    {
+      "name": "app.rate-limit.enabled",
+      "type": "java.lang.String",
+      "description": "Flag to enable or disable rate limiting for the application."
+    }
+  ]
+}
