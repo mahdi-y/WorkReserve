@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.workreserve.backend.room.DTO.RoomRequest;
@@ -14,6 +15,7 @@ import com.workreserve.backend.room.DTO.RoomResponse;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import com.workreserve.backend.timeslot.TimeSlotRepository;
+import com.workreserve.backend.config.FileStorageService;
 
 @Service
 public class RoomService {
@@ -23,6 +25,9 @@ public class RoomService {
 
     @Autowired
     private TimeSlotRepository timeSlotRepository;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @Cacheable("rooms")
     public List<RoomResponse> getAllRooms() {
@@ -46,12 +51,15 @@ public class RoomService {
         if (exists) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A room with this name already exists.");
         }
+        
         Room room = new Room();
         room.setName(request.getName().trim());
         room.setType(request.getType());
         room.setPricePerHour(request.getPricePerHour());
         room.setCapacity(request.getCapacity());
         room.setDescription(request.getDescription());
+        room.setImageUrls(request.getImageUrls() != null ? request.getImageUrls() : new ArrayList<>());
+        
         Room saved = roomRepository.save(room);
         return toResponse(saved);
     }
@@ -68,19 +76,29 @@ public class RoomService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A room with this name already exists.");
         }
 
+        List<String> oldImages = room.getImageUrls();
+        List<String> newImages = request.getImageUrls();
+        oldImages.stream()
+            .filter(oldImage -> !newImages.contains(oldImage))
+            .forEach(fileStorageService::deleteFile);
+
         room.setName(request.getName().trim());
         room.setType(request.getType());
         room.setPricePerHour(request.getPricePerHour());
         room.setCapacity(request.getCapacity());
         room.setDescription(request.getDescription());
+        room.setImageUrls(request.getImageUrls());
+        
         return toResponse(roomRepository.save(room));
     }
 
     @CacheEvict(value = "rooms", allEntries = true)
     public void deleteRoom(Long id) {
-        if (!roomRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found");
-        }
+        Room room = roomRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
+        
+        room.getImageUrls().forEach(fileStorageService::deleteFile);
+        
         roomRepository.deleteById(id);
     }
 
@@ -97,6 +115,7 @@ public class RoomService {
         res.setPricePerHour(room.getPricePerHour());
         res.setCapacity(room.getCapacity());
         res.setDescription(room.getDescription());
+        res.setImageUrls(room.getImageUrls() != null ? new ArrayList<>(room.getImageUrls()) : new ArrayList<>());
         return res;
     }
 }

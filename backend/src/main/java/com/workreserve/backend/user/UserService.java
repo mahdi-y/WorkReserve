@@ -145,7 +145,7 @@ public class UserService implements UserDetailsService {
         user.setRefreshTokenExpiry(LocalDateTime.now().plusDays(7));
         userRepository.save(user);
 
-        return new AuthResponseToken(accessToken, refreshToken);
+        return new AuthResponseToken(accessToken, refreshToken, toUserResponse(user));
     }
 
     @CacheEvict(value = {"users", "current-user"}, allEntries = true)

@@ -10,10 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.ArrayList;
 import com.workreserve.backend.room.DTO.RoomRequest;
 import com.workreserve.backend.room.DTO.RoomResponse;
+import com.workreserve.backend.config.FileStorageService;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -22,6 +25,9 @@ public class RoomController {
 
     @Autowired
     private RoomService roomService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @Operation(summary = "Get all rooms", description = "Retrieve a list of all available rooms")
     @ApiResponse(responseCode = "200", description = "List of rooms retrieved successfully")
@@ -38,6 +44,21 @@ public class RoomController {
     @GetMapping("/{id}")
     public ResponseEntity<RoomResponse> getRoomById(@PathVariable Long id) {
         return ResponseEntity.ok(roomService.getRoomById(id));
+    }
+
+    @Operation(summary = "Upload room images", description = "Upload multiple images for a room")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/images")
+    public ResponseEntity<List<String>> uploadRoomImages(
+            @RequestParam("files") MultipartFile[] files) {
+        
+        List<String> imageUrls = new ArrayList<>();
+        for (MultipartFile file : files) {
+            String imageUrl = fileStorageService.storeFile(file, "rooms");
+            imageUrls.add(imageUrl);
+        }
+        return ResponseEntity.ok(imageUrls);
     }
 
     @Operation(summary = "Create new room", description = "Create a new room (Admin only)")

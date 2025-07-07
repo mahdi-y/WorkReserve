@@ -1,5 +1,8 @@
 package com.workreserve.backend.room.DTO;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.workreserve.backend.room.RoomType;
 
 public class RoomResponse {
@@ -9,6 +12,7 @@ public class RoomResponse {
     private Double pricePerHour;
     private Integer capacity;
     private String description;
+    private List<String> imageUrls = new ArrayList<>();
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -27,4 +31,7 @@ public class RoomResponse {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public List<String> getImageUrls() { return imageUrls; }
+    public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
 }
