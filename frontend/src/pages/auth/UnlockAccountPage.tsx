@@ -120,7 +120,6 @@ const UnlockAccountPage: React.FC = () => {
               <Link to="/login">Go to Login</Link>
             </Button>
             
-            {/* Debug info - remove in production */}
             {process.env.NODE_ENV === 'development' && (
               <div className="mt-4 text-xs text-gray-500">
                 <p>Email: {email}</p>

@@ -1,159 +1,165 @@
-import React, { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Alert, AlertDescription } from '../ui/alert';
-import { Loader2 } from 'lucide-react';
+import { useToast } from '../../hooks/use-toast';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+
 
 const LoginForm: React.FC = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [rateLimit, setRateLimit] = useState(false);
-  const [cooldown, setCooldown] = useState(60); 
-
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const from = location.state?.from?.pathname || '/dashboard';
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
 
+    setLoading(true);
+    
     try {
-      await login(formData);
-      navigate(from, { replace: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      if (err.response?.status === 429) {
-        setError('Too many requests - try again later.');
-        setRateLimit(true);
-        setCooldown(60);
-        const end = Date.now() + 60 * 1000;
-        localStorage.setItem('loginCooldownEnd', end.toString());
-      } else {
-        setError(err.response?.data?.error || 'Login failed');
+      await login({ email, password });
+      
+      toast({
+        title: "Welcome back!",
+        description: "You have been successfully logged in.",
+      });
+      
+      navigate('/dashboard', { replace: true });
+      
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Invalid email or password.';
+      } else if (error.response?.status === 423) {
+        errorMessage = 'Account is locked. Please contact support.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
       }
+      
+      toast({
+        title: "Login Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    const cooldownEnd = localStorage.getItem('loginCooldownEnd');
-    if (cooldownEnd) {
-      const remaining = Math.ceil((parseInt(cooldownEnd) - Date.now()) / 1000);
-      if (remaining > 0) {
-        setRateLimit(true);
-        setCooldown(remaining);
-        setError('Too many requests - try again later.');
-      } else {
-        localStorage.removeItem('loginCooldownEnd');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (rateLimit && cooldown > 0) {
-      timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
-    }
-    if (cooldown === 0) {
-      setRateLimit(false);
-      setError('');
-      localStorage.removeItem('loginCooldownEnd');
-    }
-    return () => clearTimeout(timer);
-  }, [rateLimit, cooldown]);
-
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl text-center">Sign in</CardTitle>
-        <CardDescription className="text-center">
-          Enter your email and password to access your account
+    <Card className="border-0 shadow-none bg-transparent">
+      <CardHeader className="space-y-1 text-center">
+        <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
+        <CardDescription>
+          Enter your credentials to access your account
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {error}
-                {rateLimit && cooldown > 0 && (
-                  <span> Please wait {cooldown} second{cooldown !== 1 ? 's' : ''}.</span>
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
-              name="email"
               type="email"
               placeholder="Enter your email"
-              value={formData.email}
-              onChange={handleChange}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              autoComplete="email"
-              autoFocus
+              disabled={loading}
             />
           </div>
-
+          
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <RouterLink
-                to="/auth/forgot-password"
-                className="text-sm text-primary hover:underline"
+            <Label htmlFor="password">Password</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
               >
-                Forgot password?
-              </RouterLink>
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
             </div>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Enter your password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              autoComplete="current-password"
-            />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading || rateLimit}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {loading ? 'Signing in...' : 'Sign in'}
-          </Button>
-
-          <div className="text-center">
-            <RouterLink 
-              to="/register" 
-              className="text-sm text-primary hover:underline"
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="remember"
+                className="rounded border-gray-300"
+                disabled={loading}
+              />
+              <Label htmlFor="remember" className="text-sm">
+                Remember me
+              </Label>
+            </div>
+            <Link
+              to="/auth/forgot-password"
+              className="text-sm text-blue-600 hover:underline"
             >
-              Don't have an account? Sign up
-            </RouterLink>
+              Forgot password?
+            </Link>
           </div>
+
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In'
+            )}
+          </Button>
         </form>
+
+        <div className="mt-6 text-center text-sm">
+          <span className="text-gray-600">Don't have an account? </span>
+          <Link to="/register" className="text-blue-600 hover:underline font-medium">
+            Sign up
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );

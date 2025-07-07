@@ -35,46 +35,37 @@ export const authService = {
     return response.data;
   },
 
-  login: async (credentials: LoginCredentials): Promise<AuthResponseToken> => {
+  login: async (credentials: LoginCredentials): Promise<{ user: User; token: string }> => {
     const response = await api.post('/auth/login', credentials);
-    const { token, refreshToken, user } = response.data;
+    const { token, user } = response.data;
     
-    localStorage.setItem('accessToken', token);
-    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     
-    return response.data;
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    return { user, token };
   },
 
-  logout: () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+  logout: (): void => {
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
+    delete api.defaults.headers.common['Authorization'];
   },
 
   getCurrentUser: (): User | null => {
     try {
-      const user = localStorage.getItem('user');
-      if (!user) return null;
-      
-      return JSON.parse(user);
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
     } catch (error) {
-      console.error('Error parsing user data from localStorage:', error);
-      localStorage.removeItem('user');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      console.error('Error parsing user from localStorage:', error);
       return null;
     }
   },
 
   isAuthenticated: (): boolean => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      return !!token;
-    } catch (error) {
-      console.error('Error checking authentication:', error);
-      return false;
-    }
+    const token = localStorage.getItem('token');
+    return !!token;
   },
 
   isAdmin: (): boolean => {

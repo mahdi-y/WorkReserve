@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { authService, type User, type LoginCredentials, type RegisterData } from '../services/authService';
 
@@ -13,7 +14,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -31,28 +31,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser && authService.isAuthenticated()) {
-      setUser(currentUser);
-    }
-    setLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const currentUser = authService.getCurrentUser();
+        if (currentUser && authService.isAuthenticated()) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        authService.logout();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
-    // eslint-disable-next-line no-useless-catch
     try {
       const response = await authService.login(credentials);
       setUser(response.user);
+      console.log('Login successful, user set:', response.user);
     } catch (error) {
+      console.error('Login failed:', error);
       throw error;
     }
   };
 
   const register = async (userData: RegisterData) => {
-    // eslint-disable-next-line no-useless-catch
     try {
       await authService.register(userData);
     } catch (error) {
+      console.error('Registration failed:', error);
       throw error;
     }
   };
@@ -62,14 +73,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     login,
     register,
     logout,
     loading,
-    isAuthenticated: authService.isAuthenticated(),
-    isAdmin: authService.isAdmin(),
+    isAuthenticated: !!user && authService.isAuthenticated(),
+    isAdmin: user?.role === 'ADMIN'
   };
 
   return (

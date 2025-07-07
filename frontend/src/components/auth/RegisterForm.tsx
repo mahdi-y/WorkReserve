@@ -1,23 +1,29 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Alert, AlertDescription } from '../ui/alert';
-import { Loader2, CheckCircle } from 'lucide-react';
+import React, { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate, Link } from "react-router-dom";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Loader2, CheckCircle } from "lucide-react";
 
 const RegisterForm: React.FC = () => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
@@ -33,11 +39,11 @@ const RegisterForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       setLoading(false);
       return;
     }
@@ -48,12 +54,18 @@ const RegisterForm: React.FC = () => {
         email: formData.email,
         password: formData.password,
       });
-      
-      setSuccess('Registration successful! Please check your email to verify your account.');
-      setTimeout(() => navigate('/login'), 3000);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+      setSuccess(
+        "Registration successful! Please check your email to verify your account."
+      );
+      setTimeout(() => navigate("/login"), 3000);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Registration failed');
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Registration failed"
+      );
     } finally {
       setLoading(false);
     }
@@ -148,16 +160,16 @@ const RegisterForm: React.FC = () => {
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? "Creating account..." : "Create account"}
           </Button>
 
-          <div className="text-center">
-            <RouterLink 
-              to="/login" 
-              className="text-sm text-primary hover:underline"
-            >
-              Already have an account? Sign in
-            </RouterLink>
+          <div className="mt-6 text-center text-sm">
+            <span className="text-gray-600">Already have an account? </span>
+            <Link
+              to="/login"
+              className="text-blue-600 hover:underline font-medium">
+              Sign in
+            </Link>
           </div>
         </form>
       </CardContent>
