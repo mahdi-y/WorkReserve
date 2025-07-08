@@ -114,6 +114,10 @@ public class UserService implements UserDetailsService {
             throw new UserException("Account is locked. Please check your email to unlock.");
         }
 
+        if (user.isBanned()) {
+            throw new UserException("Your account has been banned! Please contact support.");
+        }
+
         try {
             authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
@@ -239,6 +243,8 @@ public class UserService implements UserDetailsService {
         response.setCreatedAt(user.getCreatedAt());
         response.setEnabled(user.isEnabled());
         response.setLocked(user.isLocked());
+        response.setBanned(user.isBanned());
+        response.setEmailVerified(user.isEmailVerified());
         return response;
     }
 
@@ -349,5 +355,14 @@ public class UserService implements UserDetailsService {
         userRepository.save(user);
 
         return new AuthResponseToken(newAccessToken, newRefreshToken);
+    }
+
+    @CacheEvict(value = {"users", "current-user"}, allEntries = true)
+    public UserResponse setUserBanned(Long id, boolean banned) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setBanned(banned);
+        User updatedUser = userRepository.save(user);
+        return toUserResponse(updatedUser);
     }
 }

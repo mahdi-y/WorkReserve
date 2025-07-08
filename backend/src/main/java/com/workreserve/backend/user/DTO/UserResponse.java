@@ -11,6 +11,8 @@ public class UserResponse {
     private LocalDateTime createdAt;
     private boolean enabled;
     private boolean locked;
+    private boolean banned;
+    private boolean emailVerified;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -32,4 +34,10 @@ public class UserResponse {
 
     public boolean isLocked() { return locked; }
     public void setLocked(boolean locked) { this.locked = locked; }
+
+    public boolean isBanned() { return banned; }
+    public void setBanned(boolean banned) { this.banned = banned; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 }

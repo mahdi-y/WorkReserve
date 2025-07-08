@@ -136,4 +136,18 @@ public class UserController {
     public ResponseEntity<UserResponse> getCurrentUser() {
         return ResponseEntity.ok(userService.getCurrentUser());
     }
+
+    @Operation(summary = "Ban user", description = "Ban a user account (Admin only)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/ban")
+    public ResponseEntity<UserResponse> banUser(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.setUserBanned(id, true));
+    }
+
+    @Operation(summary = "Unban user", description = "Unban a user account (Admin only)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/unban")
+    public ResponseEntity<UserResponse> unbanUser(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.setUserBanned(id, false));
+    }
 }

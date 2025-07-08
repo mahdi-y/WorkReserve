@@ -41,6 +41,7 @@ public class User implements UserDetails {
     private LocalDateTime unlockTokenCreatedAt;
     private String refreshToken;
     private LocalDateTime refreshTokenExpiry;
+    private boolean banned = false;
 
 
     @PrePersist
@@ -100,6 +101,9 @@ public class User implements UserDetails {
     public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
     public LocalDateTime getRefreshTokenExpiry() { return refreshTokenExpiry; }
     public void setRefreshTokenExpiry(LocalDateTime refreshTokenExpiry) { this.refreshTokenExpiry = refreshTokenExpiry; }
+
+    public boolean isBanned() { return banned; }
+    public void setBanned(boolean banned) { this.banned = banned; }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

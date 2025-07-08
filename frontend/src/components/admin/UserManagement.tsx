@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -9,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useToast } from '../../hooks/use-toast';
 import { userService } from '../../services/userService';
+import type { User_Service } from '../../services/userService'; 
 import { 
   Users, 
   Search, 
@@ -20,18 +23,9 @@ import {
   UserCheck, 
   UserX,
   Shield,
-  User
+  ChevronDown,
+  User,
 } from 'lucide-react';
-
-interface User {
-  id: number;
-  fullName: string;
-  email: string;
-  role: 'USER' | 'ADMIN';
-  enabled: boolean;
-  emailVerified: boolean;
-  createdAt: string;
-}
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -45,14 +39,14 @@ const itemVariants = {
 };
 
 const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User_Service[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User_Service[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User_Service | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState<Partial<User>>({});
+  const [editFormData, setEditFormData] = useState<Partial<User_Service>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -88,21 +82,9 @@ const UserManagement: React.FC = () => {
     setFilteredUsers(filtered);
   }, [users, searchTerm, roleFilter, statusFilter]);
 
-  const handleToggleUserStatus = async (userId: number) => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
-    try {
-      const updated = await userService.updateUser(userId, { enabled: !user.enabled });
-      setUsers(prev => prev.map(u => u.id === userId ? updated : u));
-      toast({ title: "User Status Updated", description: `${updated.fullName} has been ${updated.enabled ? 'enabled' : 'disabled'}.` });
-    } catch {
-      toast({ title: "Error", description: "Failed to update user status", variant: "destructive" });
-    }
-  };
-
   const handleUpdateUserRole = async (userId: number, newRole: 'USER' | 'ADMIN') => {
     try {
-      const updated = await userService.updateUser(userId, { role: newRole });
+      const updated = await userService.updateUserRole(userId, newRole);
       setUsers(prev => prev.map(u => u.id === userId ? updated : u));
       toast({ title: "User Role Updated", description: `${updated.fullName}'s role has been updated to ${newRole}.` });
     } catch {
@@ -120,7 +102,7 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: User_Service) => {
     setSelectedUser(user);
     setEditFormData({
       fullName: user.fullName,
@@ -131,7 +113,7 @@ const UserManagement: React.FC = () => {
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedUser || !editFormData.fullName || !editFormData.email) {
       toast({
         title: "Validation Error",
@@ -141,20 +123,40 @@ const UserManagement: React.FC = () => {
       return;
     }
 
-    setUsers(prev => prev.map(user => 
-      user.id === selectedUser.id 
-        ? { ...user, ...editFormData } as User
-        : user
-    ));
-    
-    setIsEditDialogOpen(false);
-    setSelectedUser(null);
-    setEditFormData({});
-    
-    toast({
-      title: "User Updated",
-      description: `${editFormData.fullName}'s information has been updated.`,
-    });
+    try {
+      // Construct a single payload with all the changes
+      const updatePayload: Partial<User_Service> = {
+        fullName: editFormData.fullName,
+        email: editFormData.email,
+        role: editFormData.role,
+        enabled: editFormData.enabled,
+      };
+
+      // Call the API once with the complete payload
+      const updatedUser = await userService.updateUser(selectedUser.id, updatePayload);
+
+      // Update the user in the local state without a full refetch
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === selectedUser.id ? { ...user, ...updatedUser } : user
+        )
+      );
+      
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+      setEditFormData({});
+      
+      toast({
+        title: "User Updated",
+        description: `${updatedUser.fullName}'s information has been updated successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Update Failed",
+        description: error.response?.data?.message || "An error occurred while updating the user.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCancelEdit = () => {
@@ -169,6 +171,37 @@ const UserManagement: React.FC = () => {
 
   const getStatusBadgeVariant = (enabled: boolean) => {
     return enabled ? 'default' : 'destructive';
+  };
+
+  const handleToggleBan = async (userId: number, banned: boolean) => {
+    console.log("Before ban/unban:", { userId, banned }); // Debug log
+    
+    try {
+      const updated = banned
+        ? await userService.unbanUser(userId)
+        : await userService.banUser(userId);
+      
+      console.log("API response:", updated); // Debug log
+      
+      // Make sure the state updates with the returned user data
+      setUsers(prev => {
+        const newUsers = prev.map(u => u.id === userId ? { ...u, banned: updated.banned } : u);
+        console.log("Updated users state:", newUsers.find(u => u.id === userId)); // Debug log
+        return newUsers;
+      });
+      
+      toast({
+        title: banned ? "User Unbanned" : "User Banned",
+        description: `${updated.fullName} has been ${banned ? "unbanned" : "banned"}.`
+      });
+    } catch (error: any) {
+      console.error("Ban/unban error:", error);
+      toast({ 
+        title: "Error", 
+        description: error.response?.data?.message || "Failed to update user ban status", 
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
@@ -267,14 +300,35 @@ const UserManagement: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getRoleBadgeVariant(user.role)} className="flex items-center gap-1 w-fit">
-                        {user.role === 'ADMIN' ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                        {user.role}
-                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="flex items-center gap-1 w-fit h-auto p-1 rounded-full text-left">
+                            <Badge variant={getRoleBadgeVariant(user.role)} className="pointer-events-none flex items-center gap-1">
+                              {user.role === 'ADMIN' ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                              {user.role}
+                            </Badge>
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem 
+                            disabled={user.role === 'USER'} 
+                            onSelect={() => handleUpdateUserRole(user.id, 'USER')}
+                          >
+                            <User className="w-4 h-4 mr-2" /> User
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            disabled={user.role === 'ADMIN'} 
+                            onSelect={() => handleUpdateUserRole(user.id, 'ADMIN')}
+                          >
+                            <Shield className="w-4 h-4 mr-2" /> Admin
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getStatusBadgeVariant(user.enabled)}>
-                        {user.enabled ? 'Active' : 'Inactive'}
+                      <Badge variant={user.banned ? 'destructive' : getStatusBadgeVariant(user.enabled)}>
+                        {user.banned ? 'Banned' : user.enabled ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -285,20 +339,33 @@ const UserManagement: React.FC = () => {
                     <TableCell>{user.createdAt}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleUserStatus(user.id)}
-                        >
-                          {user.enabled ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </Button>
-                        
+                        {/* Removed the enable/disable button */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditUser(user)}
                         >
                           <Edit3 className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          variant={user.banned ? "default" : "destructive"}
+                          size="sm"
+                          title={user.banned ? "Unban User" : "Ban User"}
+                          onClick={() => handleToggleBan(user.id, user.banned)}
+                          className={user.banned ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                        >
+                          {user.banned ? (
+                            <>
+                              <UserCheck className="w-4 h-4" />
+                              <span className="ml-1 hidden sm:inline">Unban</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserX className="w-4 h-4" />
+                              <span className="ml-1 hidden sm:inline">Ban</span>
+                            </>
+                          )}
                         </Button>
 
                         <AlertDialog>
@@ -352,7 +419,7 @@ const UserManagement: React.FC = () => {
               <Input
                 id="edit-fullName"
                 value={editFormData.fullName || ''}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                onChange={(e) => setEditFormData((prev: any) => ({ ...prev, fullName: e.target.value }))}
                 placeholder="Enter full name"
               />
             </div>
@@ -363,7 +430,7 @@ const UserManagement: React.FC = () => {
                 id="edit-email"
                 type="email"
                 value={editFormData.email || ''}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setEditFormData((prev: any) => ({ ...prev, email: e.target.value }))}
                 placeholder="Enter email address"
               />
             </div>
@@ -372,7 +439,7 @@ const UserManagement: React.FC = () => {
               <Label htmlFor="edit-role">Role</Label>
                 <Select 
                 value={editFormData.role || 'USER'} 
-                onValueChange={(value) => selectedUser && handleUpdateUserRole(selectedUser.id, value as 'USER' | 'ADMIN')}
+                onValueChange={(value) => setEditFormData((prev: any) => ({ ...prev, role: value as 'USER' | 'ADMIN' }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
@@ -389,7 +456,7 @@ const UserManagement: React.FC = () => {
                 type="checkbox"
                 id="edit-enabled"
                 checked={editFormData.enabled || false}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, enabled: e.target.checked }))}
+                onChange={(e) => setEditFormData((prev: any) => ({ ...prev, enabled: e.target.checked }))}
                 className="rounded border-gray-300"
               />
               <Label htmlFor="edit-enabled">Account Enabled</Label>
