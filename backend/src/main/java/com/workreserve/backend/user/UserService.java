@@ -36,7 +36,6 @@ public class UserService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final String frontendUrl = "http://localhost:3000"; 
 
     @Autowired
     private MailService emailService;
@@ -100,7 +99,7 @@ public class UserService implements UserDetailsService {
         user.setVerificationTokenCreatedAt(java.time.LocalDateTime.now());
         User savedUser = userRepository.save(user);
         
-        sendVerificationEmail(savedUser.getEmail(), verificationToken);
+        emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), verificationToken);
         
         String token = jwtService.generateToken(savedUser.getEmail());
         return new AuthResponse(token);
@@ -131,7 +130,7 @@ public class UserService implements UserDetailsService {
                 user.setUnlockToken(unlockToken);
                 user.setUnlockTokenCreatedAt(LocalDateTime.now());
                 userRepository.save(user);
-                sendUnlockEmail(user.getEmail(), unlockToken);
+                emailService.sendAccountUnlockEmail(user.getEmail(), user.getFullName(), unlockToken);
                 throw new UserException("Account locked due to too many failed login attempts. Check your email to unlock.");
             }
             userRepository.save(user);
@@ -205,17 +204,6 @@ public class UserService implements UserDetailsService {
         return toUserResponse(updatedUser);
     }
 
-    private void sendVerificationEmail(String to, String token) {
-    String link = frontendUrl + "/auth/verify?token=" + token; 
-    String subject = "Verify your email";
-    String text = "Welcome! Please verify your email by clicking the link: " + link;
-
-    System.out.println("EMAIL VERIFICATION LINK: " + link);
-
-    emailService.sendEmail(to, subject, text);
-
-    }
-
     public void verifyEmail(String token) {
         User user = userRepository.findAll().stream()
             .filter(u -> token.equals(u.getVerificationToken()))
@@ -232,6 +220,8 @@ public class UserService implements UserDetailsService {
         user.setEmailVerified(true);
         user.setVerificationToken(null);
         userRepository.save(user);
+
+        emailService.sendWelcomeEmail(user.getEmail(), user.getFullName());
     }
 
     private UserResponse toUserResponse(User user) {
@@ -261,7 +251,7 @@ public class UserService implements UserDetailsService {
         user.setVerificationTokenCreatedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
     
-        sendVerificationEmail(user.getEmail(), newToken);
+        emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), newToken);
     }
 
     public void changePassword(ChangePasswordRequest request) {
@@ -287,10 +277,8 @@ public class UserService implements UserDetailsService {
         user.setResetPasswordTokenCreatedAt(LocalDateTime.now());
         userRepository.save(user);
 
-        String link = frontendUrl + "/auth/reset-password?token=" + token;
-        String subject = "Password Reset Request";
-        String text = "To reset your password, click the link: " + link;
-        emailService.sendEmail(user.getEmail(), subject, text);
+        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
+
     }
 
     public void resetPassword(String token, String newPassword) {
@@ -308,13 +296,6 @@ public class UserService implements UserDetailsService {
         user.setResetPasswordToken(null);
         user.setResetPasswordTokenCreatedAt(null);
         userRepository.save(user);
-    }
-
-    private void sendUnlockEmail(String to, String unlockToken) {
-        String link = frontendUrl + "/auth/unlock?email=" + to + "&token=" + unlockToken; // Changed to frontend URL
-        String subject = "Unlock your account";
-        String text = "Your account has been locked due to too many failed login attempts. Click here to unlock: " + link;
-        emailService.sendEmail(to, subject, text);
     }
 
     public void unlockAccount(String email, String token) {

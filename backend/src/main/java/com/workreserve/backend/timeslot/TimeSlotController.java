@@ -1,6 +1,7 @@
 package com.workreserve.backend.timeslot;
 
 import com.workreserve.backend.timeslot.DTO.BulkTimeSlotRequest;
+import com.workreserve.backend.timeslot.DTO.TimeSlotGenerationRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -111,6 +112,14 @@ public class TimeSlotController {
     @PostMapping("/bulk")
     public List<TimeSlotResponse> createTimeSlotsBulk(@Valid @RequestBody BulkTimeSlotRequest request) {
         return timeSlotService.createTimeSlotsBulk(request.getTimeSlots());
+    }
+
+    @Operation(summary = "Generate bulk time slots", description = "Generate multiple time slots with advanced scheduling options (Admin only)")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/bulk-generate")
+    public List<TimeSlotResponse> generateBulkTimeSlots(@Valid @RequestBody TimeSlotGenerationRequest request) {
+        return timeSlotService.generateBulkTimeSlots(request);
     }
 
     @Operation(summary = "Update time slot", description = "Update an existing time slot (Admin only)")

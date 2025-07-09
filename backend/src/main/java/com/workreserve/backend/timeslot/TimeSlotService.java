@@ -6,6 +6,7 @@ import com.workreserve.backend.exception.ValidationException;
 import com.workreserve.backend.room.Room;
 import com.workreserve.backend.room.RoomRepository;
 import com.workreserve.backend.room.RoomService;
+import com.workreserve.backend.timeslot.DTO.TimeSlotGenerationRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotResponse;
 import com.workreserve.backend.reservation.ReservationRepository;
@@ -15,6 +16,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -179,5 +182,55 @@ public class TimeSlotService {
         response.setAvailable(isAvailable);
         
         return response;
+    }
+
+        @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots"}, allEntries = true)
+    public List<TimeSlotResponse> generateBulkTimeSlots(TimeSlotGenerationRequest request) {
+        Room room = roomRepository.findById(request.getRoomId())
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+        
+        List<TimeSlot> createdSlots = new ArrayList<>();
+        LocalDate currentDate = request.getStartDate();
+        
+        while (!currentDate.isAfter(request.getEndDate())) {
+            boolean shouldCreateSlots = true;
+            
+            if (request.isSkipWeekends() && (currentDate.getDayOfWeek().getValue() == 6 || currentDate.getDayOfWeek().getValue() == 7)) {
+                shouldCreateSlots = false;
+            }
+            
+            if (request.isRepeatWeekly() && request.getWeekDays() != null && !request.getWeekDays().isEmpty()) {
+                int dayOfWeek = currentDate.getDayOfWeek().getValue(); 
+                if (!request.getWeekDays().contains(dayOfWeek)) {
+                    shouldCreateSlots = false;
+                }
+            }
+            
+            if (shouldCreateSlots) {
+                for (TimeSlotGenerationRequest.TimeSlotTemplate template : request.getTimeSlots()) {
+                    LocalTime startTime = LocalTime.parse(template.getStartTime());
+                    LocalTime endTime = LocalTime.parse(template.getEndTime());
+                    
+                    List<TimeSlot> conflicts = timeSlotRepository.findConflictingTimeSlots(
+                            request.getRoomId(), currentDate, startTime, endTime);
+                    
+                    if (conflicts.isEmpty()) {
+                        TimeSlot timeSlot = new TimeSlot();
+                        timeSlot.setDate(currentDate);
+                        timeSlot.setStartTime(startTime);
+                        timeSlot.setEndTime(endTime);
+                        timeSlot.setRoom(room);
+                        
+                        createdSlots.add(timeSlotRepository.save(timeSlot));
+                    }
+                }
+            }
+            
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        return createdSlots.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 }
