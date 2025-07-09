@@ -18,7 +18,6 @@ import {
   Plus
 } from 'lucide-react';
 
-// Mock data - replace with actual API calls later
 const mockStats = {
   totalBookings: 12,
   upcomingBookings: 3,

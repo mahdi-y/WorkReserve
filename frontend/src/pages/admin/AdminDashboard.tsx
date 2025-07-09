@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import UserManagement from '../../components/admin/UserManagement';
 import RoomManagement from '../../components/admin/RoomManagement';
+import TimeSlotManagement from '../../components/admin/TimeSlotManagement';
 import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { 
@@ -40,7 +41,6 @@ const itemVariants = {
   }
 };
 
-// Mock admin stats
 const mockAdminStats = {
   totalUsers: 156,
   activeUsers: 142,
@@ -143,10 +143,11 @@ const AdminDashboard: React.FC = () => {
 
         <motion.div variants={itemVariants}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="users">User Management</TabsTrigger>
               <TabsTrigger value="rooms">Room Management</TabsTrigger>
+              <TabsTrigger value="timeslots">Time Slots</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -245,6 +246,10 @@ const AdminDashboard: React.FC = () => {
 
             <TabsContent value="rooms">
               <RoomManagement />
+            </TabsContent>
+
+            <TabsContent value="timeslots" className="space-y-6">
+              <TimeSlotManagement />
             </TabsContent>
           </Tabs>
         </motion.div>

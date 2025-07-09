@@ -124,7 +124,6 @@ const UserManagement: React.FC = () => {
     }
 
     try {
-      // Construct a single payload with all the changes
       const updatePayload: Partial<User_Service> = {
         fullName: editFormData.fullName,
         email: editFormData.email,
@@ -132,10 +131,8 @@ const UserManagement: React.FC = () => {
         enabled: editFormData.enabled,
       };
 
-      // Call the API once with the complete payload
       const updatedUser = await userService.updateUser(selectedUser.id, updatePayload);
 
-      // Update the user in the local state without a full refetch
       setUsers(prevUsers => 
         prevUsers.map(user => 
           user.id === selectedUser.id ? { ...user, ...updatedUser } : user
@@ -174,19 +171,18 @@ const UserManagement: React.FC = () => {
   };
 
   const handleToggleBan = async (userId: number, banned: boolean) => {
-    console.log("Before ban/unban:", { userId, banned }); // Debug log
+    console.log("Before ban/unban:", { userId, banned });
     
     try {
       const updated = banned
         ? await userService.unbanUser(userId)
         : await userService.banUser(userId);
       
-      console.log("API response:", updated); // Debug log
+      console.log("API response:", updated); 
       
-      // Make sure the state updates with the returned user data
       setUsers(prev => {
         const newUsers = prev.map(u => u.id === userId ? { ...u, banned: updated.banned } : u);
-        console.log("Updated users state:", newUsers.find(u => u.id === userId)); // Debug log
+        console.log("Updated users state:", newUsers.find(u => u.id === userId));
         return newUsers;
       });
       

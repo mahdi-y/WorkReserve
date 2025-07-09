@@ -27,7 +27,7 @@ import {
   Link2
 } from 'lucide-react';
 import { roomService } from '../../services/roomService';
-import api from '../../lib/api'; // Add this import
+import api from '../../lib/api'; 
 
 interface Room {
   id: number;
@@ -205,11 +205,9 @@ const RoomForm = ({
         />
       </div>
 
-      {/* Image Management Section */}
       <div className="space-y-3">
         <Label>Room Images</Label>
         
-        {/* Upload Mode Toggle */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
           <Button
             type="button"
@@ -233,7 +231,6 @@ const RoomForm = ({
           </Button>
         </div>
 
-        {/* URL Input Mode */}
         {uploadMode === 'url' && (
           <div className="flex gap-2">
             <Input
@@ -254,7 +251,6 @@ const RoomForm = ({
           </div>
         )}
 
-        {/* File Upload Mode */}
         {uploadMode === 'file' && (
           <div>
             <input
