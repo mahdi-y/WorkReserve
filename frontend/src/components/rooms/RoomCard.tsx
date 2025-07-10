@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Users, Building2, Layout, Users2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Room } from '../../services/roomService';
+import { useNavigate } from 'react-router-dom';
 
 interface RoomCardProps {
   room: Room;
@@ -20,7 +21,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
   onViewDetails, 
   showActions = true 
 }) => {
-
+  const navigate = useNavigate();
   
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());

@@ -15,6 +15,9 @@ import RoomDetailsPage from './pages/rooms/RoomDetailsPage';
 import LandingPage from './pages/LandingPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+import BookingPage from './pages/booking/BookingPage';
+import MyReservationsPage from './pages/reservations/MyReservationsPage';
+
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -58,6 +61,22 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <RoomDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/booking"
+          element={
+            <ProtectedRoute>
+              <BookingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reservations"
+          element={
+            <ProtectedRoute>
+              <MyReservationsPage />
             </ProtectedRoute>
           }
         />
