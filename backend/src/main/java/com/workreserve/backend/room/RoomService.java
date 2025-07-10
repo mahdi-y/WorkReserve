@@ -6,6 +6,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +17,10 @@ import com.workreserve.backend.room.DTO.RoomResponse;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import com.workreserve.backend.timeslot.TimeSlotRepository;
+import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.config.FileStorageService;
+import com.workreserve.backend.user.User;
+import com.workreserve.backend.user.UserRepository;
 
 @Service
 public class RoomService {
@@ -28,6 +33,12 @@ public class RoomService {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private ActivityService activityService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Cacheable("rooms")
     public List<RoomResponse> getAllRooms() {
@@ -60,8 +71,21 @@ public class RoomService {
         room.setDescription(request.getDescription());
         room.setImageUrls(request.getImageUrls() != null ? request.getImageUrls() : new ArrayList<>());
         
-        Room saved = roomRepository.save(room);
-        return toResponse(saved);
+        Room savedRoom = roomRepository.save(room);
+
+        // Log activity using current user's email instead of ID
+        String currentUserEmail = getCurrentUserEmail();
+        if (currentUserEmail != null) {
+            activityService.logActivity(
+                currentUserEmail, 
+                "New room created: " + savedRoom.getName(),
+                "ROOM",
+                savedRoom.getId(),
+                savedRoom.getName()
+            );
+        }
+        
+        return toResponse(savedRoom);
     }
 
     @CacheEvict(value = "rooms", allEntries = true)
@@ -89,13 +113,39 @@ public class RoomService {
         room.setDescription(request.getDescription());
         room.setImageUrls(request.getImageUrls());
         
-        return toResponse(roomRepository.save(room));
+        Room updatedRoom = roomRepository.save(room);
+
+        // Log activity for room update
+        String currentUserEmail = getCurrentUserEmail();
+        if (currentUserEmail != null) {
+            activityService.logActivity(
+                currentUserEmail, 
+                "Room updated: " + updatedRoom.getName(),
+                "ROOM",
+                updatedRoom.getId(),
+                updatedRoom.getName()
+            );
+        }
+        
+        return toResponse(updatedRoom);
     }
 
     @CacheEvict(value = "rooms", allEntries = true)
     public void deleteRoom(Long id) {
         Room room = roomRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
+        
+        // Log activity for room deletion
+        String currentUserEmail = getCurrentUserEmail();
+        if (currentUserEmail != null) {
+            activityService.logActivity(
+                currentUserEmail, 
+                "Room deleted: " + room.getName(),
+                "ROOM",
+                room.getId(),
+                room.getName()
+            );
+        }
         
         room.getImageUrls().forEach(fileStorageService::deleteFile);
         
@@ -105,6 +155,26 @@ public class RoomService {
     public List<RoomResponse> getAvailableRooms(LocalDate date, LocalTime startTime, LocalTime endTime) {
         List<Room> rooms = timeSlotRepository.findAvailableRooms(date, startTime, endTime);
         return rooms.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    // Helper method to get current user's email from security context
+    private String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return null;
+    }
+
+    // Helper method to get current user's ID (alternative approach)
+    private Long getCurrentUserId() {
+        String currentUserEmail = getCurrentUserEmail();
+        if (currentUserEmail != null) {
+            return userRepository.findByEmail(currentUserEmail)
+                .map(User::getId)
+                .orElse(null);
+        }
+        return null;
     }
 
     private RoomResponse toResponse(Room room) {

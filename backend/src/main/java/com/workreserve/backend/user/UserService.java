@@ -1,5 +1,6 @@
 package com.workreserve.backend.user;
 
+import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.config.JwtService;
 import com.workreserve.backend.user.DTO.AuthResponse;
 import com.workreserve.backend.user.DTO.AuthResponseToken;
@@ -29,6 +30,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+import com.workreserve.backend.activity.ActivityService;
+
+
 @Service
 public class UserService implements UserDetailsService {
 
@@ -40,7 +46,12 @@ public class UserService implements UserDetailsService {
     @Autowired
     private MailService emailService;
 
+    @Autowired
+    private ActivityService activityService;
+
     private static final int MAX_FAILED_ATTEMPTS = 5;
+
+    
 
     public UserService(
         UserRepository userRepository,
@@ -99,6 +110,14 @@ public class UserService implements UserDetailsService {
         user.setVerificationTokenCreatedAt(java.time.LocalDateTime.now());
         User savedUser = userRepository.save(user);
         
+        activityService.logActivity(
+            savedUser.getId(),
+            "New user registered: " + savedUser.getEmail(),
+            "USER",
+            savedUser.getId(),
+            savedUser.getFullName()
+        );
+        
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), verificationToken);
         
         String token = jwtService.generateToken(savedUser.getEmail());
@@ -156,7 +175,6 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        
         if (!user.getEmail().equals(request.getEmail()) && 
             userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new RuntimeException("Email already in use");
@@ -165,12 +183,20 @@ public class UserService implements UserDetailsService {
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
         
-        
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
         User updatedUser = userRepository.save(user);
+
+        activityService.logActivity(
+            user.getId(),
+            "Updated profile information",
+            "USER",
+            user.getId(),
+            user.getFullName()
+        );
+
         return toUserResponse(updatedUser);
     }
 
@@ -205,21 +231,26 @@ public class UserService implements UserDetailsService {
     }
 
     public void verifyEmail(String token) {
-        User user = userRepository.findAll().stream()
-            .filter(u -> token.equals(u.getVerificationToken()))
-            .findFirst()
-            .orElseThrow(() -> new UserException("Invalid or expired verification token"));
+        User user = userRepository.findByVerificationToken(token)
+                .orElseThrow(() -> new UserException("Invalid verification token."));
 
         if (user.getVerificationTokenCreatedAt() == null ||
-            user.getVerificationTokenCreatedAt().plusHours(24).isBefore(java.time.LocalDateTime.now())) {
-            throw new TokenExpiredException("Verification token has expired. Please request a new verification email.");
+            user.getVerificationTokenCreatedAt().plusHours(24).isBefore(LocalDateTime.now())) {
+            throw new UserException("Verification token has expired. Please request a new one.");
         }
-        if (user.isEmailVerified()) {
-            throw new UserException("Email already verified");
-        }
+
         user.setEmailVerified(true);
         user.setVerificationToken(null);
+        user.setVerificationTokenCreatedAt(null);
         userRepository.save(user);
+
+        activityService.logActivity(
+            user.getId(),
+            "Verified email address",
+            "USER",
+            user.getId(),
+            user.getFullName()
+        );
 
         emailService.sendWelcomeEmail(user.getEmail(), user.getFullName());
     }
@@ -345,5 +376,13 @@ public class UserService implements UserDetailsService {
         user.setBanned(banned);
         User updatedUser = userRepository.save(user);
         return toUserResponse(updatedUser);
+    }
+
+    private String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return null;
     }
 }
