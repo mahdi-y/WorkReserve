@@ -17,6 +17,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import BookingPage from './pages/booking/BookingPage';
 import MyReservationsPage from './pages/reservations/MyReservationsPage';
+import ProfilePage from './pages/profile/ProfilePage'; // Import ProfilePage
 
 
 function AnimatedRoutes() {
@@ -77,6 +78,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <MyReservationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

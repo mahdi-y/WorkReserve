@@ -284,7 +284,6 @@ const MyReservationsPage: React.FC = () => {
         animate="visible"
         className="space-y-6"
       >
-        {/* Header */}
         <motion.div
           variants={itemVariants}
           className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl p-6 shadow-lg"
@@ -316,7 +315,6 @@ const MyReservationsPage: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
         <motion.div
           variants={itemVariants}
           className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4"
@@ -393,7 +391,6 @@ const MyReservationsPage: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Filters */}
         <motion.div variants={itemVariants}>
           <Card>
             <CardHeader>
@@ -468,7 +465,6 @@ const MyReservationsPage: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Main Content */}
         <motion.div variants={itemVariants}>
           <Tabs defaultValue="all" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">

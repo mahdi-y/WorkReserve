@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { useAuth } from '../../context/AuthContext';
 import { reservationService } from '../../services/reservationService';
 import { activityService } from '../../services/activityService';
+import { timeSlotService } from '../../services/timeSlotService';
 import { useToast } from '../../hooks/use-toast';
 import { 
   Calendar, 
@@ -76,14 +78,26 @@ const DashboardPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await reservationService.getMine();
-      setReservations(data);
       
-      // Calculate stats from real data
+      const enriched = await Promise.all(
+        data.map(async (reservation) => {
+          try {
+            const slot = await timeSlotService.getTimeSlotById(reservation.slotId);
+            return { ...reservation, slot };
+          } catch (error) {
+            console.error('Failed to load slot details:', error);
+            return reservation;
+          }
+        })
+      );
+      
+      setReservations(enriched); 
+      
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
-      const upcomingReservations = data.filter(r => {
+      const upcomingReservations = enriched.filter(r => {
         if (r.slot) {
           const slotDate = new Date(`${r.slot.date}T${r.slot.startTime}`);
           return slotDate > now && r.status !== 'CANCELLED';
@@ -91,7 +105,7 @@ const DashboardPage: React.FC = () => {
         return false;
       });
       
-      const thisMonthReservations = data.filter(r => {
+      const thisMonthReservations = enriched.filter(r => {
         if (r.slot) {
           const slotDate = new Date(r.slot.date);
           return slotDate.getMonth() === currentMonth && 
@@ -111,7 +125,6 @@ const DashboardPage: React.FC = () => {
         return acc;
       }, 0);
       
-      // Replace the hardcoded 'Conference Room' with real calculation
       const calculateFavoriteRoomType = (reservations: any[]) => {
         const roomTypeCounts = reservations.reduce((acc, reservation) => {
           if (reservation.slot?.room?.type) {
@@ -119,21 +132,21 @@ const DashboardPage: React.FC = () => {
           }
           return acc;
         }, {} as Record<string, number>);
-  
+
         if (Object.keys(roomTypeCounts).length === 0) return 'None';
-  
+
         const mostBookedType = Object.entries(roomTypeCounts).reduce((a, b) => 
           roomTypeCounts[a[0]] > roomTypeCounts[b[0]] ? a : b
         );
-  
+
         return mostBookedType[0];
       };
-  
+
       setStats({
-        totalBookings: data.length,
+        totalBookings: enriched.length,
         upcomingBookings: upcomingReservations.length,
         hoursBookedThisMonth: Math.round(totalHours),
-        favoriteRoomType: calculateFavoriteRoomType(data)
+        favoriteRoomType: calculateFavoriteRoomType(enriched)
       });
     } catch (error) {
       console.error('Failed to load reservations:', error);
@@ -213,7 +226,6 @@ const DashboardPage: React.FC = () => {
         animate="visible"
         className="space-y-6"
       >
-        {/* Welcome Banner */}
         <motion.div
           variants={itemVariants}
           className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 rounded-lg shadow-lg p-6 text-white"
@@ -240,7 +252,6 @@ const DashboardPage: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
         <motion.div
           variants={itemVariants}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
@@ -286,13 +297,12 @@ const DashboardPage: React.FC = () => {
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-sm">{stats.favoriteRoomType}</div>
+              <div className="text-2xl font-bold">{stats.favoriteRoomType}</div>
               <p className="text-xs text-muted-foreground">Most booked</p>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Main Content Tabs */}
         <motion.div variants={itemVariants}>
           <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
@@ -303,7 +313,6 @@ const DashboardPage: React.FC = () => {
 
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Quick Actions */}
                 <Card className="lg:col-span-1">
                   <CardHeader>
                     <CardTitle>Quick Actions</CardTitle>
@@ -341,7 +350,6 @@ const DashboardPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                {/* Upcoming Reservations */}
                 <Card className="lg:col-span-2">
                   <CardHeader>
                     <div className="flex justify-between items-center">
