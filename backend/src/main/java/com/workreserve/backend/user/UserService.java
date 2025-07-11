@@ -6,6 +6,7 @@ import com.workreserve.backend.user.DTO.AuthResponse;
 import com.workreserve.backend.user.DTO.AuthResponseToken;
 import com.workreserve.backend.user.DTO.LoginRequest;
 import com.workreserve.backend.user.DTO.RegisterRequest;
+import com.workreserve.backend.user.DTO.UpdateProfileRequest;
 import com.workreserve.backend.user.DTO.UserResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -87,11 +88,22 @@ public class UserService implements UserDetailsService {
         return toUserResponse(user);
     }
 
-    @Cacheable(value = "current-user", key = "#email")
+    @Cacheable(value = "current-user", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public UserResponse getCurrentUser() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UserException("User not authenticated");
+        }
+        
+        String email = authentication.getName();
+        if (email == null || email.equals("anonymousUser")) {
+            throw new UserException("User not authenticated");
+        }
+        
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserException("User not found with email: " + email));
+        
         return toUserResponse(user);
     }
 
@@ -375,6 +387,49 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setBanned(banned);
         User updatedUser = userRepository.save(user);
+        return toUserResponse(updatedUser);
+    }
+
+    @CacheEvict(value = {"users", "current-user"}, allEntries = true)
+    public UserResponse updateCurrentUserProfile(UpdateProfileRequest request) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserException("User not found"));
+
+        // Update full name if provided
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            user.setFullName(request.getFullName().trim());
+        }
+
+        // Update email if provided and different from current
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            // Check if new email is already taken by another user
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new UserException("Email already in use by another account");
+            }
+            
+            user.setEmail(request.getEmail());
+            user.setEmailVerified(false); // Require re-verification for new email
+            
+            // Send verification email for new email address
+            String verificationToken = UUID.randomUUID().toString();
+            user.setVerificationToken(verificationToken);
+            user.setVerificationTokenCreatedAt(LocalDateTime.now());
+            
+            emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), verificationToken);
+        }
+
+        User updatedUser = userRepository.save(user);
+
+        // Log activity
+        activityService.logActivity(
+            user.getId(),
+            "Updated profile information",
+            "USER",
+            user.getId(),
+            user.getFullName()
+        );
+
         return toUserResponse(updatedUser);
     }
 

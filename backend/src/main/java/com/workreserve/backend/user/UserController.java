@@ -150,4 +150,17 @@ public class UserController {
     public ResponseEntity<UserResponse> unbanUser(@PathVariable Long id) {
         return ResponseEntity.ok(userService.setUserBanned(id, false));
     }
+
+    @Operation(summary = "Update current user profile", description = "Update the current authenticated user's profile information")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Profile updated successfully",
+                content = @Content(schema = @Schema(implementation = UserResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Validation error or email already in use"),
+        @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    @PutMapping("/me")
+    public ResponseEntity<UserResponse> updateCurrentUserProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(userService.updateCurrentUserProfile(request));
+    }
 }
