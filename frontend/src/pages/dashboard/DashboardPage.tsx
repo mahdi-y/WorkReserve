@@ -78,7 +78,6 @@ const DashboardPage: React.FC = () => {
       const data = await reservationService.getMine();
       setReservations(data);
       
-      // Calculate stats from real data
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
@@ -111,7 +110,6 @@ const DashboardPage: React.FC = () => {
         return acc;
       }, 0);
       
-      // Replace the hardcoded 'Conference Room' with real calculation
       const calculateFavoriteRoomType = (reservations: any[]) => {
         const roomTypeCounts = reservations.reduce((acc, reservation) => {
           if (reservation.slot?.room?.type) {

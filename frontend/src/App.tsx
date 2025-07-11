@@ -17,6 +17,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import BookingPage from './pages/booking/BookingPage';
 import MyReservationsPage from './pages/reservations/MyReservationsPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 
 
 function AnimatedRoutes() {
@@ -31,6 +32,7 @@ function AnimatedRoutes() {
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/auth/verify" element={<VerifyEmailPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage/> } />
         
         <Route
           path="/dashboard"

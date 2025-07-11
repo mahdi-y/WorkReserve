@@ -97,7 +97,6 @@ const MyReservationsPage: React.FC = () => {
       const data = await reservationService.getMine();
       setReservations(data);
       
-      // Enrich reservations with slot details
       const enriched = await Promise.all(
         data.map(async (reservation) => {
           try {
@@ -112,7 +111,6 @@ const MyReservationsPage: React.FC = () => {
       
       setEnrichedReservations(enriched);
       
-      // Calculate stats
       const newStats = {
         total: enriched.length,
         confirmed: enriched.filter(r => r.status === 'CONFIRMED').length,
@@ -137,7 +135,6 @@ const MyReservationsPage: React.FC = () => {
   const filterReservations = () => {
     let filtered = [...enrichedReservations];
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(r => 
         r.slot?.room?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -145,12 +142,10 @@ const MyReservationsPage: React.FC = () => {
       );
     }
 
-    // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(r => r.status === statusFilter);
     }
 
-    // Date filter
     if (dateFilter !== 'all') {
       const now = new Date();
       filtered = filtered.filter(r => {

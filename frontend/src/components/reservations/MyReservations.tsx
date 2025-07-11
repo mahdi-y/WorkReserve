@@ -28,7 +28,6 @@ const MyReservations: React.FC = () => {
       const data = await reservationService.getMine();
       setReservations(data);
       
-      // Enrich reservations with slot details (limit to 5 for dashboard)
       const enriched = await Promise.all(
         data.slice(0, 5).map(async (reservation) => {
           try {
