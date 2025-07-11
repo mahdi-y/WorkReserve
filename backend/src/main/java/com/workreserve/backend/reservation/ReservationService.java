@@ -92,7 +92,6 @@ public class ReservationService {
 
         Reservation savedReservation = reservationRepository.save(reservation);
 
-        // Log activity using user ID from the reservation
         activityService.logActivity(
             user.getId(),
             "Booked " + timeSlot.getRoom().getName(),

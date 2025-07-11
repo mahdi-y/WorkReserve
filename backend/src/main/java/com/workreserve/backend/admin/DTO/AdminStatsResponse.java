@@ -20,7 +20,6 @@ public class AdminStatsResponse {
         this.revenue = revenue;
     }
 
-    // Getters and setters
     public long getTotalUsers() { return totalUsers; }
     public void setTotalUsers(long totalUsers) { this.totalUsers = totalUsers; }
     

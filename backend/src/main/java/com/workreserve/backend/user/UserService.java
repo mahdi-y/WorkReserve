@@ -112,7 +112,7 @@ public class UserService implements UserDetailsService {
         
         activityService.logActivity(
             savedUser.getId(),
-            "New user registered: " + savedUser.getEmail(),
+            "User registered: " + savedUser.getEmail(),
             "USER",
             savedUser.getId(),
             savedUser.getFullName()

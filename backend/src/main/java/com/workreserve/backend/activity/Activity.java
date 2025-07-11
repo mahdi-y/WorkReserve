@@ -30,7 +30,6 @@ public class Activity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    // Constructors
     public Activity() {
         this.createdAt = LocalDateTime.now();
     }

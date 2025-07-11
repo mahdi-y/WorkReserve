@@ -1,5 +1,6 @@
 package com.workreserve.backend.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -7,35 +8,32 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class CorsConfig {
+
+    @Value("${cors.allowed-origins:http://localhost:3000}")
+    private String allowedOrigins;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000"
-            // "https://workreserve.com"
-        ));
+        if ("*".equals(allowedOrigins)) {
+            configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+            configuration.setAllowCredentials(true);
+        } else {
+            List<String> origins = Arrays.asList(allowedOrigins.split(","));
+            configuration.setAllowedOrigins(origins);
+            configuration.setAllowCredentials(true);
+        }
         
         configuration.setAllowedMethods(Arrays.asList(
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
         
-        configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization",
-            "Cache-Control",
-            "Content-Type",
-            "Accept",
-            "X-Requested-With",
-            "Access-Control-Allow-Origin",
-            "Access-Control-Allow-Headers",
-            "Origin"
-        ));
-        
-        configuration.setAllowCredentials(true);
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         
         configuration.setExposedHeaders(Arrays.asList(
             "Authorization",
