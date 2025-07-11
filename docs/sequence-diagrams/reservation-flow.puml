@@ -1,0 +1,216 @@
+@startuml Reservation Flow
+title WorkReserve Backend - Reservation Management Flow
+
+participant "Client" as Client
+participant "JwtAuthFilter" as AuthFilter
+participant "ReservationController" as ResvCtrl
+participant "ReservationService" as ResvSvc
+participant "UserRepository" as UserRepo
+participant "TimeSlotRepository" as TimeSlotRepo
+participant "ReservationRepository" as ResvRepo
+participant "ActivityService" as ActivitySvc
+participant "Cache" as Cache
+participant "Database" as DB
+
+== Create Reservation ==
+
+Client -> AuthFilter: POST /api/reservations\nAuthorization: Bearer <token>
+activate AuthFilter
+AuthFilter -> AuthFilter: validateJwtToken()
+AuthFilter -> Client: Authentication successful
+deactivate AuthFilter
+
+Client -> ResvCtrl: POST /api/reservations\n{timeSlotId, purpose}
+activate ResvCtrl
+
+ResvCtrl -> ResvSvc: createReservation(request)
+activate ResvSvc
+
+ResvSvc -> ResvSvc: getCurrentUser()\nfrom SecurityContext
+ResvSvc -> UserRepo: findByEmail(currentUserEmail)
+activate UserRepo
+UserRepo -> DB: SELECT * FROM users WHERE email = ?
+activate DB
+DB --> UserRepo: User
+deactivate DB
+UserRepo --> ResvSvc: User
+deactivate UserRepo
+
+ResvSvc -> TimeSlotRepo: findById(timeSlotId)
+activate TimeSlotRepo
+TimeSlotRepo -> DB: SELECT * FROM time_slots WHERE id = ?
+activate DB
+DB --> TimeSlotRepo: TimeSlot
+deactivate DB
+TimeSlotRepo --> ResvSvc: TimeSlot
+deactivate TimeSlotRepo
+
+alt TimeSlot not found
+    ResvSvc --> ResvCtrl: throw ResourceNotFoundException("TimeSlot not found")
+    ResvCtrl --> Client: 404 Not Found
+else TimeSlot exists
+    ResvSvc -> ResvSvc: validateTimeSlotAvailability(timeSlot)
+    
+    ResvSvc -> ResvRepo: findByTimeSlotIdAndStatus(timeSlotId, CONFIRMED)
+    activate ResvRepo
+    ResvRepo -> DB: SELECT * FROM reservations WHERE time_slot_id = ? AND status = 'CONFIRMED'
+    activate DB
+    DB --> ResvRepo: Existing reservations
+    deactivate DB
+    ResvRepo --> ResvSvc: List<Reservation>
+    deactivate ResvRepo
+    
+    alt TimeSlot already reserved
+        ResvSvc --> ResvCtrl: throw ConflictException("TimeSlot already reserved")
+        ResvCtrl --> Client: 400 Bad Request
+    else TimeSlot available
+        ResvSvc -> ResvSvc: createReservationEntity(user, timeSlot, purpose)
+        
+        ResvSvc -> ResvRepo: save(reservation)
+        activate ResvRepo
+        ResvRepo -> DB: INSERT INTO reservations (user_id, time_slot_id, purpose, status, created_at)
+        activate DB
+        DB --> ResvRepo: Reservation ID
+        deactivate DB
+        ResvRepo --> ResvSvc: savedReservation
+        deactivate ResvRepo
+        
+        ResvSvc -> TimeSlotRepo: updateAvailability(timeSlotId, false)
+        activate TimeSlotRepo
+        TimeSlotRepo -> DB: UPDATE time_slots SET is_available = false WHERE id = ?
+        activate DB
+        DB --> TimeSlotRepo: Success
+        deactivate DB
+        TimeSlotRepo --> ResvSvc: Updated
+        deactivate TimeSlotRepo
+        
+        ResvSvc -> ActivitySvc: logActivity(user, "RESERVATION_CREATED", reservationId)
+        activate ActivitySvc
+        ActivitySvc -> DB: INSERT INTO activities (user_id, action, resource_id, timestamp)
+        activate DB
+        DB --> ActivitySvc: Activity logged
+        deactivate DB
+        ActivitySvc --> ResvSvc: Success
+        deactivate ActivitySvc
+        
+        ResvSvc -> Cache: evict("user-reservations", userId)
+        activate Cache
+        Cache --> ResvSvc: Cache cleared
+        deactivate Cache
+        
+        ResvSvc -> ResvSvc: toResponse(savedReservation)
+        ResvSvc --> ResvCtrl: ReservationResponse
+        deactivate ResvSvc
+        ResvCtrl --> Client: 200 OK with reservation details
+        deactivate ResvCtrl
+    end
+end
+
+== Get User Reservations ==
+
+Client -> ResvCtrl: GET /api/reservations/user
+activate ResvCtrl
+
+ResvCtrl -> ResvSvc: getUserReservations()
+activate ResvSvc
+
+ResvSvc -> ResvSvc: getCurrentUser()
+ResvSvc -> UserRepo: findByEmail(currentUserEmail)
+activate UserRepo
+UserRepo -> DB: SELECT * FROM users WHERE email = ?
+activate DB
+DB --> UserRepo: User
+deactivate DB
+UserRepo --> ResvSvc: User
+deactivate UserRepo
+
+ResvSvc -> Cache: get("user-reservations", userId)
+activate Cache
+Cache --> ResvSvc: Cache miss
+deactivate Cache
+
+ResvSvc -> ResvRepo: findByUserId(userId)
+activate ResvRepo
+ResvRepo -> DB: SELECT r.*, ts.*, room.* FROM reservations r\nJOIN time_slots ts ON r.time_slot_id = ts.id\nJOIN rooms room ON ts.room_id = room.id\nWHERE r.user_id = ?
+activate DB
+DB --> ResvRepo: List<Reservation>
+deactivate DB
+ResvRepo --> ResvSvc: List<Reservation>
+deactivate ResvRepo
+
+ResvSvc -> ResvSvc: toResponseList(reservations)
+
+ResvSvc -> Cache: put("user-reservations", userId, responseList)
+activate Cache
+Cache --> ResvSvc: Cached
+deactivate Cache
+
+ResvSvc --> ResvCtrl: List<ReservationResponse>
+deactivate ResvSvc
+ResvCtrl --> Client: 200 OK with reservations list
+deactivate ResvCtrl
+
+== Cancel Reservation ==
+
+Client -> ResvCtrl: DELETE /api/reservations/{id}
+activate ResvCtrl
+
+ResvCtrl -> ResvSvc: cancelReservation(id)
+activate ResvSvc
+
+ResvSvc -> ResvRepo: findById(id)
+activate ResvRepo
+ResvRepo -> DB: SELECT * FROM reservations WHERE id = ?
+activate DB
+DB --> ResvRepo: Reservation
+deactivate DB
+ResvRepo --> ResvSvc: Reservation
+deactivate ResvRepo
+
+ResvSvc -> ResvSvc: validateUserOwnership(reservation, currentUser)
+
+alt User doesn't own reservation
+    ResvSvc --> ResvCtrl: throw AccessDeniedException()
+    ResvCtrl --> Client: 403 Forbidden
+else User owns reservation
+    ResvSvc -> ResvSvc: reservation.setStatus(CANCELLED)
+    
+    ResvSvc -> ResvRepo: save(reservation)
+    activate ResvRepo
+    ResvRepo -> DB: UPDATE reservations SET status = 'CANCELLED', updated_at = NOW()
+    activate DB
+    DB --> ResvRepo: Success
+    deactivate DB
+    ResvRepo --> ResvSvc: Updated reservation
+    deactivate ResvRepo
+    
+    ResvSvc -> TimeSlotRepo: updateAvailability(timeSlotId, true)
+    activate TimeSlotRepo
+    TimeSlotRepo -> DB: UPDATE time_slots SET is_available = true WHERE id = ?
+    activate DB
+    DB --> TimeSlotRepo: Success
+    deactivate DB
+    TimeSlotRepo --> ResvSvc: Updated
+    deactivate TimeSlotRepo
+    
+    ResvSvc -> ActivitySvc: logActivity(user, "RESERVATION_CANCELLED", reservationId)
+    activate ActivitySvc
+    ActivitySvc -> DB: INSERT INTO activities (user_id, action, resource_id, timestamp)
+    activate DB
+    DB --> ActivitySvc: Activity logged
+    deactivate DB
+    ActivitySvc --> ResvSvc: Success
+    deactivate ActivitySvc
+    
+    ResvSvc -> Cache: evict("user-reservations", userId)
+    activate Cache
+    Cache --> ResvSvc: Cache cleared
+    deactivate Cache
+    
+    ResvSvc --> ResvCtrl: Success
+    deactivate ResvSvc
+    ResvCtrl --> Client: 204 No Content
+    deactivate ResvCtrl
+end
+
+@enduml

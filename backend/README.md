@@ -211,6 +211,25 @@ Run all tests with:
 
 ---
 
+## Architecture Documentation
+
+### Sequence Diagrams
+
+Comprehensive sequence diagrams are available to understand the backend architecture and request flows:
+
+- 📁 **Location**: [`../docs/sequence-diagrams/`](../docs/sequence-diagrams/)
+- 📖 **Overview**: [`../SEQUENCE_DIAGRAMS.md`](../SEQUENCE_DIAGRAMS.md)
+
+**Available diagrams:**
+- **Authentication Flow**: User registration, login, email verification
+- **Reservation Flow**: Creating, viewing, and cancelling reservations  
+- **Admin Management Flow**: Room creation, time slot management, admin operations
+- **Complete Backend Overview**: Comprehensive system architecture overview
+
+These diagrams show the interactions between Controllers, Services, Repositories, and external systems like the database and email service.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).

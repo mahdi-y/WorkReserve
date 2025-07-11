@@ -1,0 +1,148 @@
+@startuml Authentication Flow
+title WorkReserve Backend - Authentication Flow
+
+participant "Client" as Client
+participant "AuthController" as AuthCtrl
+participant "UserService" as UserSvc
+participant "AuthenticationManager" as AuthMgr
+participant "JwtService" as JwtSvc
+participant "UserRepository" as UserRepo
+participant "MailService" as MailSvc
+participant "Database" as DB
+
+== User Registration ==
+
+Client -> AuthCtrl: POST /api/auth/register\n{email, password, firstName, lastName}
+activate AuthCtrl
+
+AuthCtrl -> UserSvc: registerUser(request)
+activate UserSvc
+
+UserSvc -> UserRepo: findByEmail(email)
+activate UserRepo
+UserRepo -> DB: SELECT * FROM users WHERE email = ?
+activate DB
+DB --> UserRepo: User or null
+deactivate DB
+UserRepo --> UserSvc: Optional<User>
+deactivate UserRepo
+
+alt Email already exists
+    UserSvc --> AuthCtrl: throw UserException("Email already exists")
+    AuthCtrl --> Client: 400 Bad Request
+else Email available
+    UserSvc -> UserSvc: encodePassword(password)
+    UserSvc -> UserRepo: save(newUser)
+    activate UserRepo
+    UserRepo -> DB: INSERT INTO users (...)
+    activate DB
+    DB --> UserRepo: User ID
+    deactivate DB
+    UserRepo --> UserSvc: savedUser
+    deactivate UserRepo
+    
+    UserSvc -> MailSvc: sendVerificationEmail(user)
+    activate MailSvc
+    MailSvc -> MailSvc: generateVerificationToken()
+    MailSvc --> UserSvc: Email sent
+    deactivate MailSvc
+    
+    UserSvc --> AuthCtrl: AuthResponse("User registered successfully")
+    deactivate UserSvc
+    AuthCtrl --> Client: 200 OK
+    deactivate AuthCtrl
+end
+
+== User Login ==
+
+Client -> AuthCtrl: POST /api/auth/login\n{email, password}
+activate AuthCtrl
+
+AuthCtrl -> UserSvc: loginUser(request)
+activate UserSvc
+
+UserSvc -> AuthMgr: authenticate(email, password)
+activate AuthMgr
+AuthMgr -> UserRepo: findByEmail(email)
+activate UserRepo
+UserRepo -> DB: SELECT * FROM users WHERE email = ?
+activate DB
+DB --> UserRepo: User data
+deactivate DB
+UserRepo --> AuthMgr: UserDetails
+deactivate UserRepo
+
+AuthMgr -> AuthMgr: validateCredentials()
+AuthMgr --> UserSvc: Authentication result
+deactivate AuthMgr
+
+alt Authentication successful
+    UserSvc -> UserSvc: checkUserStatus()\n(enabled, verified, not locked)
+    
+    UserSvc -> JwtSvc: generateToken(userDetails)
+    activate JwtSvc
+    JwtSvc -> JwtSvc: createAccessToken()
+    JwtSvc -> JwtSvc: createRefreshToken()
+    JwtSvc --> UserSvc: AuthResponseToken(accessToken, refreshToken)
+    deactivate JwtSvc
+    
+    UserSvc -> UserRepo: updateLastLogin(user)
+    activate UserRepo
+    UserRepo -> DB: UPDATE users SET last_login = NOW()
+    activate DB
+    DB --> UserRepo: Success
+    deactivate DB
+    UserRepo --> UserSvc: Updated user
+    deactivate UserRepo
+    
+    UserSvc --> AuthCtrl: AuthResponseToken
+    deactivate UserSvc
+    AuthCtrl --> Client: 200 OK with tokens
+    deactivate AuthCtrl
+else Authentication failed
+    UserSvc -> UserSvc: incrementFailedAttempts()
+    UserSvc --> AuthCtrl: throw UserException("Invalid credentials")
+    AuthCtrl --> Client: 400 Bad Request
+end
+
+== Email Verification ==
+
+Client -> AuthCtrl: GET /api/auth/verify?token=xyz
+activate AuthCtrl
+
+AuthCtrl -> UserSvc: verifyEmail(token)
+activate UserSvc
+
+UserSvc -> UserSvc: validateToken(token)
+
+alt Token valid
+    UserSvc -> UserRepo: findByVerificationToken(token)
+    activate UserRepo
+    UserRepo -> DB: SELECT * FROM users WHERE verification_token = ?
+    activate DB
+    DB --> UserRepo: User
+    deactivate DB
+    UserRepo --> UserSvc: User
+    deactivate UserRepo
+    
+    UserSvc -> UserSvc: user.setEnabled(true)\nuser.setVerificationToken(null)
+    
+    UserSvc -> UserRepo: save(user)
+    activate UserRepo
+    UserRepo -> DB: UPDATE users SET enabled = true, verification_token = null
+    activate DB
+    DB --> UserRepo: Success
+    deactivate DB
+    UserRepo --> UserSvc: Updated user
+    deactivate UserRepo
+    
+    UserSvc --> AuthCtrl: "Email verified successfully"
+    deactivate UserSvc
+    AuthCtrl --> Client: 200 OK
+    deactivate AuthCtrl
+else Token invalid/expired
+    UserSvc --> AuthCtrl: throw TokenExpiredException()
+    AuthCtrl --> Client: 400 Bad Request
+end
+
+@enduml

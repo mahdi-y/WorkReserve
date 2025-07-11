@@ -1,0 +1,166 @@
+@startuml Complete Backend Overview
+title WorkReserve Backend - Complete System Interaction Overview
+
+participant "Client/Frontend" as Client
+participant "Spring Security\n(JwtAuthFilter)" as Security
+participant "Controllers Layer" as Controllers #LightBlue
+participant "Services Layer" as Services #LightGreen
+participant "Repositories Layer" as Repositories #LightYellow
+participant "Configuration\n(JWT, Mail, Cache)" as Config #LightCoral
+participant "PostgreSQL Database" as Database #LightGray
+participant "Email Service" as Email #LightPink
+participant "Cache Layer\n(Caffeine)" as Cache #LightCyan
+
+== System Startup & Configuration ==
+
+note over Controllers, Database: Application Starts
+Controllers -> Config: Initialize Security, JWT, Mail, Cache configurations
+Config -> Database: Establish database connections
+Config -> Email: Configure SMTP settings
+Config -> Cache: Initialize cache providers
+
+== Request Processing Flow ==
+
+Client -> Security: HTTP Request with JWT Token
+activate Security
+Security -> Config: Validate JWT Token
+activate Config
+Config -> Security: Token validation result
+deactivate Config
+
+alt Invalid Token
+    Security -> Client: 401 Unauthorized
+else Valid Token
+    Security -> Controllers: Forward authenticated request
+    deactivate Security
+    activate Controllers
+    
+    Controllers -> Controllers: Extract request parameters & validate
+    Controllers -> Services: Business logic call
+    activate Services
+    
+    Services -> Cache: Check cache for data
+    activate Cache
+    Cache -> Services: Cache hit/miss result
+    deactivate Cache
+    
+    alt Cache Miss
+        Services -> Repositories: Data access request
+        activate Repositories
+        Repositories -> Database: SQL Query/Command
+        activate Database
+        Database -> Repositories: Query results
+        deactivate Database
+        Repositories -> Services: Domain objects
+        deactivate Repositories
+        
+        Services -> Cache: Store result in cache
+        activate Cache
+        Cache -> Services: Data cached
+        deactivate Cache
+    end
+    
+    Services -> Services: Process business logic
+    Services -> Controllers: Business result
+    deactivate Services
+    
+    Controllers -> Controllers: Format response
+    Controllers -> Client: HTTP Response
+    deactivate Controllers
+end
+
+== Core Domain Flows ==
+
+group Authentication & User Management
+    Client -> Controllers: POST /api/auth/register
+    Controllers -> Services: UserService.registerUser()
+    Services -> Repositories: UserRepository.save()
+    Services -> Config: MailService.sendVerificationEmail()
+    Config -> Email: Send verification email
+    
+    Client -> Controllers: POST /api/auth/login
+    Controllers -> Services: UserService.loginUser()
+    Services -> Config: JwtService.generateToken()
+    Services -> Repositories: UserRepository.updateLastLogin()
+end
+
+group Room & Time Slot Management
+    Client -> Controllers: GET /api/rooms
+    Controllers -> Services: RoomService.getAllRooms()
+    Services -> Cache: Check rooms cache
+    Services -> Repositories: RoomRepository.findAll()
+    
+    Client -> Controllers: POST /api/timeslots/bulk-generate
+    Controllers -> Services: TimeSlotService.generateBulkTimeSlots()
+    Services -> Repositories: TimeSlotRepository.saveAll()
+    Services -> Cache: Evict timeslots cache
+end
+
+group Reservation Management
+    Client -> Controllers: POST /api/reservations
+    Controllers -> Services: ReservationService.createReservation()
+    Services -> Repositories: TimeSlotRepository.findById()
+    Services -> Repositories: ReservationRepository.save()
+    Services -> Repositories: TimeSlotRepository.updateAvailability()
+    Services -> Services: ActivityService.logActivity()
+    Services -> Cache: Evict user-reservations cache
+    
+    Client -> Controllers: GET /api/reservations/user
+    Controllers -> Services: ReservationService.getUserReservations()
+    Services -> Cache: Check user-reservations cache
+    Services -> Repositories: ReservationRepository.findByUserId()
+end
+
+group Admin Operations
+    Client -> Controllers: GET /api/admin/stats
+    Controllers -> Services: AdminService.getAdminStats()
+    Services -> Repositories: UserRepository.count()
+    Services -> Repositories: RoomRepository.count()
+    Services -> Repositories: ReservationRepository.countByStatus()
+    Services -> Repositories: TimeSlotRepository.countByIsAvailable()
+end
+
+== Error Handling & Cross-Cutting Concerns ==
+
+note over Controllers, Database: Global Exception Handler
+Controllers -> Controllers: GlobalExceptionHandler.handleExceptions()
+
+note over Services, Cache: Activity Logging
+Services -> Services: ActivityService logs all major operations
+Services -> Repositories: ActivityRepository.save()
+
+note over Security, Cache: Rate Limiting
+Security -> Security: RateLimitFilter applies rate limiting
+
+note over Services, Email: Email Notifications
+Services -> Config: MailService for various notifications
+Config -> Config: MailTemplateService for email templates
+Config -> Email: SMTP email delivery
+
+note over Cache, Database: Caching Strategy
+Cache -> Cache: @Cacheable annotations on service methods
+Cache -> Cache: Cache eviction on data modifications
+Cache -> Cache: TTL-based cache expiration
+
+== Data Flow Summary ==
+
+note over Client, Database
+**Request Flow:**
+1. Client sends HTTP request
+2. Spring Security validates JWT
+3. Controller receives & validates request
+4. Service processes business logic
+5. Repository accesses database
+6. Cache stores/retrieves data
+7. Response flows back to client
+
+**Key Components:**
+- **Controllers**: REST API endpoints
+- **Services**: Business logic & transactions
+- **Repositories**: JPA data access
+- **Security**: JWT-based authentication
+- **Cache**: Performance optimization
+- **Config**: Cross-cutting concerns
+end note
+
+@enduml

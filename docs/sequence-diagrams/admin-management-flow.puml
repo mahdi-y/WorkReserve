@@ -1,0 +1,269 @@
+@startuml Admin Management Flow
+title WorkReserve Backend - Admin Management Flow
+
+participant "Admin Client" as Admin
+participant "JwtAuthFilter" as AuthFilter
+participant "TimeSlotController" as TSCtrl
+participant "RoomController" as RoomCtrl
+participant "AdminController" as AdminCtrl
+participant "TimeSlotService" as TSSvc
+participant "RoomService" as RoomSvc
+participant "AdminService" as AdminSvc
+participant "TimeSlotRepository" as TSRepo
+participant "RoomRepository" as RoomRepo
+participant "ReservationRepository" as ResvRepo
+participant "UserRepository" as UserRepo
+participant "ActivityService" as ActivitySvc
+participant "Cache" as Cache
+participant "Database" as DB
+
+== Admin Authentication Check ==
+
+Admin -> AuthFilter: POST /api/admin/stats\nAuthorization: Bearer <token>
+activate AuthFilter
+AuthFilter -> AuthFilter: validateJwtToken()
+AuthFilter -> AuthFilter: checkRole("ADMIN")
+alt Not Admin
+    AuthFilter --> Admin: 403 Forbidden
+else Admin Role Confirmed
+    AuthFilter -> Admin: Authentication successful
+    deactivate AuthFilter
+end
+
+== Create Room ==
+
+Admin -> RoomCtrl: POST /api/rooms\n{name, description, capacity, amenities, imageUrls}
+activate RoomCtrl
+
+RoomCtrl -> RoomSvc: createRoom(request)
+activate RoomSvc
+
+RoomSvc -> RoomRepo: findByName(name)
+activate RoomRepo
+RoomRepo -> DB: SELECT * FROM rooms WHERE name = ?
+activate DB
+DB --> RoomRepo: Room or null
+deactivate DB
+RoomRepo --> RoomSvc: Optional<Room>
+deactivate RoomRepo
+
+alt Room name exists
+    RoomSvc --> RoomCtrl: throw ConflictException("Room name already exists")
+    RoomCtrl --> Admin: 400 Bad Request
+else Room name available
+    RoomSvc -> RoomSvc: createRoomEntity(request)
+    
+    RoomSvc -> RoomRepo: save(room)
+    activate RoomRepo
+    RoomRepo -> DB: INSERT INTO rooms (name, description, capacity, amenities, image_urls, created_at)
+    activate DB
+    DB --> RoomRepo: Room ID
+    deactivate DB
+    RoomRepo --> RoomSvc: savedRoom
+    deactivate RoomRepo
+    
+    RoomSvc -> ActivitySvc: logActivity(admin, "ROOM_CREATED", roomId)
+    activate ActivitySvc
+    ActivitySvc -> DB: INSERT INTO activities (user_id, action, resource_id, timestamp)
+    activate DB
+    DB --> ActivitySvc: Activity logged
+    deactivate DB
+    ActivitySvc --> RoomSvc: Success
+    deactivate ActivitySvc
+    
+    RoomSvc -> Cache: evict("rooms")
+    activate Cache
+    Cache --> RoomSvc: Cache cleared
+    deactivate Cache
+    
+    RoomSvc -> RoomSvc: toResponse(savedRoom)
+    RoomSvc --> RoomCtrl: RoomResponse
+    deactivate RoomSvc
+    RoomCtrl --> Admin: 200 OK with room details
+    deactivate RoomCtrl
+end
+
+== Generate Bulk Time Slots ==
+
+Admin -> TSCtrl: POST /api/timeslots/bulk-generate\n{roomId, startDate, endDate, startTime, endTime, duration, dayOfWeek[]}
+activate TSCtrl
+
+TSCtrl -> TSSvc: generateBulkTimeSlots(request)
+activate TSSvc
+
+TSSvc -> RoomRepo: findById(roomId)
+activate RoomRepo
+RoomRepo -> DB: SELECT * FROM rooms WHERE id = ?
+activate DB
+DB --> RoomRepo: Room
+deactivate DB
+RoomRepo --> TSSvc: Room
+deactivate RoomRepo
+
+TSSvc -> TSSvc: validateDateRange(startDate, endDate)
+TSSvc -> TSSvc: generateTimeSlotSchedule(request)
+
+loop For each date in range
+    loop For each time slot in day
+        TSSvc -> TSRepo: findByRoomIdAndDateAndTime(roomId, date, time)
+        activate TSRepo
+        TSRepo -> DB: SELECT * FROM time_slots WHERE room_id = ? AND date = ? AND start_time = ?
+        activate DB
+        DB --> TSRepo: Existing slot or null
+        deactivate DB
+        TSRepo --> TSSvc: Optional<TimeSlot>
+        deactivate TSRepo
+        
+        alt Slot doesn't exist
+            TSSvc -> TSSvc: createTimeSlotEntity(room, date, time)
+            TSSvc -> TSRepo: save(timeSlot)
+            activate TSRepo
+            TSRepo -> DB: INSERT INTO time_slots (room_id, date, start_time, end_time, is_available, created_at)
+            activate DB
+            DB --> TSRepo: TimeSlot ID
+            deactivate DB
+            TSRepo --> TSSvc: savedTimeSlot
+            deactivate TSRepo
+        end
+    end
+end
+
+TSSvc -> ActivitySvc: logActivity(admin, "BULK_TIMESLOTS_CREATED", count)
+activate ActivitySvc
+ActivitySvc -> DB: INSERT INTO activities (user_id, action, resource_id, timestamp)
+activate DB
+DB --> ActivitySvc: Activity logged
+deactivate DB
+ActivitySvc --> TSSvc: Success
+deactivate ActivitySvc
+
+TSSvc -> Cache: evict("timeslots")
+activate Cache
+Cache --> TSSvc: Cache cleared
+deactivate Cache
+
+TSSvc -> TSSvc: toResponseList(createdTimeSlots)
+TSSvc --> TSCtrl: List<TimeSlotResponse>
+deactivate TSSvc
+TSCtrl --> Admin: 200 OK with created time slots
+deactivate TSCtrl
+
+== Get Admin Statistics ==
+
+Admin -> AdminCtrl: GET /api/admin/stats
+activate AdminCtrl
+
+AdminCtrl -> AdminSvc: getAdminStats()
+activate AdminSvc
+
+AdminSvc -> UserRepo: count()
+activate UserRepo
+UserRepo -> DB: SELECT COUNT(*) FROM users
+activate DB
+DB --> UserRepo: Total users count
+deactivate DB
+UserRepo --> AdminSvc: userCount
+deactivate UserRepo
+
+AdminSvc -> RoomRepo: count()
+activate RoomRepo
+RoomRepo -> DB: SELECT COUNT(*) FROM rooms
+activate DB
+DB --> RoomRepo: Total rooms count
+deactivate DB
+RoomRepo --> AdminSvc: roomCount
+deactivate RoomRepo
+
+AdminSvc -> ResvRepo: countByStatus("CONFIRMED")
+activate ResvRepo
+ResvRepo -> DB: SELECT COUNT(*) FROM reservations WHERE status = 'CONFIRMED'
+activate DB
+DB --> ResvRepo: Active reservations count
+deactivate DB
+ResvRepo --> AdminSvc: activeReservationsCount
+deactivate ResvRepo
+
+AdminSvc -> TSRepo: countByIsAvailable(true)
+activate TSRepo
+TSRepo -> DB: SELECT COUNT(*) FROM time_slots WHERE is_available = true
+activate DB
+DB --> TSRepo: Available slots count
+deactivate DB
+TSRepo --> AdminSvc: availableSlotsCount
+deactivate TSRepo
+
+AdminSvc -> ResvRepo: findRecentReservations(limit)
+activate ResvRepo
+ResvRepo -> DB: SELECT * FROM reservations ORDER BY created_at DESC LIMIT ?
+activate DB
+DB --> ResvRepo: Recent reservations
+deactivate DB
+ResvRepo --> AdminSvc: recentReservations
+deactivate ResvRepo
+
+AdminSvc -> AdminSvc: buildStatsResponse(userCount, roomCount, activeReservationsCount, availableSlotsCount, recentReservations)
+AdminSvc --> AdminCtrl: AdminStatsResponse
+deactivate AdminSvc
+AdminCtrl --> Admin: 200 OK with statistics
+deactivate AdminCtrl
+
+== Delete Time Slot (with Validation) ==
+
+Admin -> TSCtrl: DELETE /api/timeslots/{id}
+activate TSCtrl
+
+TSCtrl -> TSSvc: deleteTimeSlot(id)
+activate TSSvc
+
+TSSvc -> TSRepo: findById(id)
+activate TSRepo
+TSRepo -> DB: SELECT * FROM time_slots WHERE id = ?
+activate DB
+DB --> TSRepo: TimeSlot
+deactivate DB
+TSRepo --> TSSvc: TimeSlot
+deactivate TSRepo
+
+TSSvc -> ResvRepo: findByTimeSlotIdAndStatus(id, "CONFIRMED")
+activate ResvRepo
+ResvRepo -> DB: SELECT * FROM reservations WHERE time_slot_id = ? AND status = 'CONFIRMED'
+activate DB
+DB --> ResvRepo: Active reservations
+deactivate DB
+ResvRepo --> TSSvc: List<Reservation>
+deactivate ResvRepo
+
+alt Has active reservations
+    TSSvc --> TSCtrl: throw ValidationException("Cannot delete time slot with active reservations")
+    TSCtrl --> Admin: 400 Bad Request
+else No active reservations
+    TSSvc -> TSRepo: delete(timeSlot)
+    activate TSRepo
+    TSRepo -> DB: DELETE FROM time_slots WHERE id = ?
+    activate DB
+    DB --> TSRepo: Success
+    deactivate DB
+    TSRepo --> TSSvc: Deleted
+    deactivate TSRepo
+    
+    TSSvc -> ActivitySvc: logActivity(admin, "TIMESLOT_DELETED", id)
+    activate ActivitySvc
+    ActivitySvc -> DB: INSERT INTO activities (user_id, action, resource_id, timestamp)
+    activate DB
+    DB --> ActivitySvc: Activity logged
+    deactivate DB
+    ActivitySvc --> TSSvc: Success
+    deactivate ActivitySvc
+    
+    TSSvc -> Cache: evict("timeslots")
+    activate Cache
+    Cache --> TSSvc: Cache cleared
+    deactivate Cache
+    
+    TSSvc --> TSCtrl: Success
+    deactivate TSSvc
+    TSCtrl --> Admin: 204 No Content
+    deactivate TSCtrl
+end
+
+@enduml
