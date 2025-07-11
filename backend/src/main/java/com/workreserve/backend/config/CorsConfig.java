@@ -20,14 +20,13 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        if ("*".equals(allowedOrigins)) {
-            configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-            configuration.setAllowCredentials(true);
-        } else {
-            List<String> origins = Arrays.asList(allowedOrigins.split(","));
-            configuration.setAllowedOrigins(origins);
-            configuration.setAllowCredentials(true);
-        }
+        List<String> allowedOrigins = Arrays.asList(
+            "http://localhost:3000",
+            "https://2557fa434649.ngrok-free.app"
+        );
+        
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowCredentials(true);
         
         configuration.setAllowedMethods(Arrays.asList(
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
