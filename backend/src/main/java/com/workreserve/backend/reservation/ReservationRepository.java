@@ -12,4 +12,5 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Optional<Reservation> findByUserIdAndSlotId(Long userId, Long slotId);
     @Query("SELECT SUM(r.totalCost) FROM Reservation r WHERE r.status != 'CANCELLED'")
     Double sumTotalCost();
+    List<Reservation> findBySlotIdAndStatusNot(Long slotId, ReservationStatus status);
 }

@@ -396,22 +396,18 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
 
-        // Update full name if provided
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
             user.setFullName(request.getFullName().trim());
         }
 
-        // Update email if provided and different from current
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            // Check if new email is already taken by another user
             if (userRepository.findByEmail(request.getEmail()).isPresent()) {
                 throw new UserException("Email already in use by another account");
             }
             
             user.setEmail(request.getEmail());
-            user.setEmailVerified(false); // Require re-verification for new email
+            user.setEmailVerified(false); 
             
-            // Send verification email for new email address
             String verificationToken = UUID.randomUUID().toString();
             user.setVerificationToken(verificationToken);
             user.setVerificationTokenCreatedAt(LocalDateTime.now());
@@ -421,7 +417,6 @@ public class UserService implements UserDetailsService {
 
         User updatedUser = userRepository.save(user);
 
-        // Log activity
         activityService.logActivity(
             user.getId(),
             "Updated profile information",
@@ -433,11 +428,4 @@ public class UserService implements UserDetailsService {
         return toUserResponse(updatedUser);
     }
 
-    private String getCurrentUserEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            return authentication.getName();
-        }
-        return null;
-    }
 }

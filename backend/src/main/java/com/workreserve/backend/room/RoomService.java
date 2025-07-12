@@ -73,7 +73,6 @@ public class RoomService {
         
         Room savedRoom = roomRepository.save(room);
 
-        // Log activity using current user's email instead of ID
         String currentUserEmail = getCurrentUserEmail();
         if (currentUserEmail != null) {
             activityService.logActivity(
@@ -115,7 +114,6 @@ public class RoomService {
         
         Room updatedRoom = roomRepository.save(room);
 
-        // Log activity for room update
         String currentUserEmail = getCurrentUserEmail();
         if (currentUserEmail != null) {
             activityService.logActivity(
@@ -135,7 +133,6 @@ public class RoomService {
         Room room = roomRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
         
-        // Log activity for room deletion
         String currentUserEmail = getCurrentUserEmail();
         if (currentUserEmail != null) {
             activityService.logActivity(
@@ -157,22 +154,10 @@ public class RoomService {
         return rooms.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // Helper method to get current user's email from security context
     private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
             return authentication.getName();
-        }
-        return null;
-    }
-
-    // Helper method to get current user's ID (alternative approach)
-    private Long getCurrentUserId() {
-        String currentUserEmail = getCurrentUserEmail();
-        if (currentUserEmail != null) {
-            return userRepository.findByEmail(currentUserEmail)
-                .map(User::getId)
-                .orElse(null);
         }
         return null;
     }

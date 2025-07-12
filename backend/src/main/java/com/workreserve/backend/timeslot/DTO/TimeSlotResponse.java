@@ -12,6 +12,8 @@ public class TimeSlotResponse {
     private LocalTime endTime;
     private RoomResponse room;
     private boolean isAvailable;
+    private boolean isBookedByCurrentUser;
+    private String bookedByUserName;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -30,4 +32,10 @@ public class TimeSlotResponse {
 
     public boolean isAvailable() { return isAvailable; }
     public void setAvailable(boolean available) { isAvailable = available; }
+
+    public boolean isBookedByCurrentUser() { return isBookedByCurrentUser; }
+    public void setBookedByCurrentUser(boolean bookedByCurrentUser) { this.isBookedByCurrentUser = bookedByCurrentUser; }
+
+    public String getBookedByUserName() { return bookedByUserName; }
+    public void setBookedByUserName(String bookedByUserName) { this.bookedByUserName = bookedByUserName; }
 }

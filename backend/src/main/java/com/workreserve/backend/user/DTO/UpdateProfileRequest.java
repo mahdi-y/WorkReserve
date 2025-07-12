@@ -10,7 +10,6 @@ public class UpdateProfileRequest {
     @Email(message = "Email should be valid")
     private String email;
     
-    // Getters and setters
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
     

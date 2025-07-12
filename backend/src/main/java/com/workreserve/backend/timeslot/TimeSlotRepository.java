@@ -44,4 +44,6 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
         @Param("startTime") LocalTime startTime,
         @Param("endTime") LocalTime endTime
     );
+
+    
 }

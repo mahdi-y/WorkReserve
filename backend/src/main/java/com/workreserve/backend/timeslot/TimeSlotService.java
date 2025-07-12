@@ -9,7 +9,9 @@ import com.workreserve.backend.room.RoomService;
 import com.workreserve.backend.timeslot.DTO.TimeSlotGenerationRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotResponse;
+import com.workreserve.backend.reservation.Reservation;
 import com.workreserve.backend.reservation.ReservationRepository;
+import com.workreserve.backend.reservation.ReservationStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
@@ -19,7 +21,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Service
 public class TimeSlotService {
@@ -38,8 +43,9 @@ public class TimeSlotService {
 
     @Cacheable("timeslots")
     public List<TimeSlotResponse> getAllTimeSlots() {
+        String currentUserEmail = getCurrentUserEmail();
         return timeSlotRepository.findAll().stream()
-                .map(this::toResponse)
+                .map(slot -> toResponse(slot, currentUserEmail))
                 .collect(Collectors.toList());
     }
 
@@ -68,9 +74,10 @@ public class TimeSlotService {
 
     @Cacheable(value = "daterange-timeslots", key = "#startDate + '-' + #endDate")
     public List<TimeSlotResponse> getTimeSlotsByDateRange(LocalDate startDate, LocalDate endDate) {
+        String currentUserEmail = getCurrentUserEmail();
         List<TimeSlot> timeSlots = timeSlotRepository.findByDateBetween(startDate, endDate);
         return timeSlots.stream()
-                .map(this::toResponse)
+                .map(slot -> toResponse(slot, currentUserEmail))
                 .collect(Collectors.toList());
     }
 
@@ -170,6 +177,10 @@ public class TimeSlotService {
     }
 
     private TimeSlotResponse toResponse(TimeSlot timeSlot) {
+        return toResponse(timeSlot, null);
+    }
+
+    private TimeSlotResponse toResponse(TimeSlot timeSlot, String currentUserEmail) {
         TimeSlotResponse response = new TimeSlotResponse();
         response.setId(timeSlot.getId());
         response.setDate(timeSlot.getDate());
@@ -177,9 +188,25 @@ public class TimeSlotService {
         response.setEndTime(timeSlot.getEndTime());
         response.setRoom(roomService.getRoomById(timeSlot.getRoom().getId()));
         
-        boolean isAvailable = !reservationRepository.existsBySlotIdAndStatusNot(
-                timeSlot.getId(), com.workreserve.backend.reservation.ReservationStatus.CANCELLED);
-        response.setAvailable(isAvailable);
+        Optional<Reservation> activeReservation = reservationRepository
+            .findBySlotIdAndStatusNot(timeSlot.getId(), ReservationStatus.CANCELLED)
+            .stream()
+            .findFirst();
+        
+        if (activeReservation.isPresent()) {
+            response.setAvailable(false);
+            Reservation reservation = activeReservation.get();
+            response.setBookedByUserName(reservation.getUser().getFullName());
+            
+            if (currentUserEmail != null) {
+                response.setBookedByCurrentUser(
+                    reservation.getUser().getEmail().equals(currentUserEmail)
+                );
+            }
+        } else {
+            response.setAvailable(true);
+            response.setBookedByCurrentUser(false);
+        }
         
         return response;
     }
@@ -232,5 +259,10 @@ public class TimeSlotService {
         return createdSlots.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    private String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
     }
 }
