@@ -93,7 +93,6 @@ const RoomDetailsPage: React.FC = () => {
     }
   };
 
-  // Use actual DB images or fallback
   const roomImages = room && room.imageUrls && room.imageUrls.length > 0
     ? room.imageUrls
     : [`https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=384&fit=crop&auto=format`];

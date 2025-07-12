@@ -13,11 +13,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useToast } from '../../hooks/use-toast';
 import { userService } from '../../services/userService';
+import { useAuth } from '../../context/AuthContext'; 
 import type { User_Service } from '../../services/userService'; 
 import { 
   Users, 
   Search, 
-  Plus, 
   Edit3, 
   Trash2, 
   UserCheck, 
@@ -25,6 +25,7 @@ import {
   Shield,
   ChevronDown,
   User,
+  Crown, 
 } from 'lucide-react';
 
 const itemVariants = {
@@ -48,6 +49,19 @@ const UserManagement: React.FC = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<User_Service>>({});
   const { toast } = useToast();
+  const { user: currentUser } = useAuth(); 
+
+  const isCurrentUser = (user: User_Service): boolean => {
+    return !!(currentUser && currentUser.email === user.email);
+  };
+
+  const isOtherAdmin = (user: User_Service): boolean => {
+    return user.role === 'ADMIN' && !isCurrentUser(user);
+  };
+
+  const isActionDisabled = (user: User_Service): boolean => {
+    return isCurrentUser(user) || isOtherAdmin(user);
+  };
 
   useEffect(() => {
     userService.getAllUsers()
@@ -83,6 +97,26 @@ const UserManagement: React.FC = () => {
   }, [users, searchTerm, roleFilter, statusFilter]);
 
   const handleUpdateUserRole = async (userId: number, newRole: 'USER' | 'ADMIN') => {
+    const targetUser = users.find(u => u.id === userId);
+    
+    if (targetUser && isCurrentUser(targetUser)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot change your own role.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (targetUser && isOtherAdmin(targetUser)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot change another admin's role.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     try {
       const updated = await userService.updateUserRole(userId, newRole);
       setUsers(prev => prev.map(u => u.id === userId ? updated : u));
@@ -93,6 +127,26 @@ const UserManagement: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: number) => {
+    const targetUser = users.find(u => u.id === userId);
+    
+    if (targetUser && isCurrentUser(targetUser)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot delete your own account.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (targetUser && isOtherAdmin(targetUser)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot delete another admin's account.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     try {
       await userService.deleteUser(userId);
       setUsers(prev => prev.filter(u => u.id !== userId));
@@ -103,6 +157,24 @@ const UserManagement: React.FC = () => {
   };
 
   const handleEditUser = (user: User_Service) => {
+    if (isCurrentUser(user)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot edit your own account from here. Use your profile settings instead.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (isOtherAdmin(user)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot edit another admin's account.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setSelectedUser(user);
     setEditFormData({
       fullName: user.fullName,
@@ -171,6 +243,26 @@ const UserManagement: React.FC = () => {
   };
 
   const handleToggleBan = async (userId: number, banned: boolean) => {
+    const targetUser = users.find(u => u.id === userId);
+    
+    if (targetUser && isCurrentUser(targetUser)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot ban your own account.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (targetUser && isOtherAdmin(targetUser)) {
+      toast({ 
+        title: "Action Restricted", 
+        description: "You cannot ban another admin's account.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     console.log("Before ban/unban:", { userId, banned });
     
     try {
@@ -200,6 +292,16 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const getDisabledTooltip = (user: User_Service, action: string) => {
+    if (isCurrentUser(user)) {
+      return `Cannot ${action} your own account`;
+    }
+    if (isOtherAdmin(user)) {
+      return `Cannot ${action} another admin's account`;
+    }
+    return `${action} user`;
+  };
+
   return (
     <motion.div variants={itemVariants} className="space-y-6">
       <Card>
@@ -212,10 +314,7 @@ const UserManagement: React.FC = () => {
               </CardTitle>
               <CardDescription>Manage user accounts, roles, and permissions</CardDescription>
             </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add User
-            </Button>
+
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -288,22 +387,51 @@ const UserManagement: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow 
+                    key={user.id} 
+                    className={
+                      isCurrentUser(user) 
+                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" 
+                        : isOtherAdmin(user)
+                        ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+                        : ""
+                    }
+                  >
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{user.fullName}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            {user.fullName}
+                            {isCurrentUser(user) && (
+                              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                                <Crown className="w-3 h-3 mr-1" />
+                                You
+                              </Badge>
+                            )}
+                            {isOtherAdmin(user) && (
+                              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Admin
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">{user.email}</div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="flex items-center gap-1 w-fit h-auto p-1 rounded-full text-left">
+                          <Button 
+                            variant="ghost" 
+                            className="flex items-center gap-1 w-fit h-auto p-1 rounded-full text-left"
+                            disabled={isActionDisabled(user)}
+                          >
                             <Badge variant={getRoleBadgeVariant(user.role)} className="pointer-events-none flex items-center gap-1">
                               {user.role === 'ADMIN' ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
                               {user.role}
                             </Badge>
-                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                            {!isActionDisabled(user) && <ChevronDown className="w-4 h-4 text-gray-500" />}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
@@ -335,11 +463,12 @@ const UserManagement: React.FC = () => {
                     <TableCell>{user.createdAt}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {/* Removed the enable/disable button */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditUser(user)}
+                          disabled={isActionDisabled(user)}
+                          title={getDisabledTooltip(user, "edit")}
                         >
                           <Edit3 className="w-4 h-4" />
                         </Button>
@@ -347,8 +476,9 @@ const UserManagement: React.FC = () => {
                         <Button
                           variant={user.banned ? "default" : "destructive"}
                           size="sm"
-                          title={user.banned ? "Unban User" : "Ban User"}
+                          title={getDisabledTooltip(user, user.banned ? "unban" : "ban")}
                           onClick={() => handleToggleBan(user.id, user.banned)}
+                          disabled={isActionDisabled(user)}
                           className={user.banned ? "bg-green-600 hover:bg-green-700 text-white" : ""}
                         >
                           {user.banned ? (
@@ -366,7 +496,12 @@ const UserManagement: React.FC = () => {
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={isActionDisabled(user)}
+                              title={getDisabledTooltip(user, "delete")}
+                            >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </AlertDialogTrigger>

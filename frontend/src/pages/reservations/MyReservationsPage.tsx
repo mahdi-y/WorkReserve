@@ -97,7 +97,6 @@ const MyReservationsPage: React.FC = () => {
       const data = await reservationService.getMine();
       setReservations(data);
       
-      // Enrich reservations with slot details
       const enriched = await Promise.all(
         data.map(async (reservation) => {
           try {
@@ -112,7 +111,6 @@ const MyReservationsPage: React.FC = () => {
       
       setEnrichedReservations(enriched);
       
-      // Calculate stats
       const newStats = {
         total: enriched.length,
         confirmed: enriched.filter(r => r.status === 'CONFIRMED').length,
@@ -137,7 +135,6 @@ const MyReservationsPage: React.FC = () => {
   const filterReservations = () => {
     let filtered = [...enrichedReservations];
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(r => 
         r.slot?.room?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -145,12 +142,10 @@ const MyReservationsPage: React.FC = () => {
       );
     }
 
-    // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(r => r.status === statusFilter);
     }
 
-    // Date filter
     if (dateFilter !== 'all') {
       const now = new Date();
       filtered = filtered.filter(r => {
@@ -306,7 +301,7 @@ const MyReservationsPage: React.FC = () => {
               <Button 
                 onClick={() => navigate('/rooms')}
                 variant="outline"
-                className="border-white text-white hover:bg-white hover:text-blue-600"
+                className="bg-white text-blue-600 hover:bg-blue-50"
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 Browse Rooms
@@ -654,7 +649,6 @@ const MyReservationsPage: React.FC = () => {
                           animate={{ opacity: 1, y: 0 }}
                           className="border rounded-lg p-6 hover:shadow-lg transition-all duration-200 dark:border-gray-700 border-l-4 border-l-blue-500"
                         >
-                          {/* Same content as above but with upcoming-specific styling */}
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold">

@@ -41,13 +41,11 @@ const ProfilePage: React.FC = () => {
     confirm: false
   });
 
-  // Profile update form data (only fullName and email)
   const [formData, setFormData] = useState<ProfileUpdateData>({
     fullName: '',
     email: ''
   });
 
-  // Password change form data (separate from profile)
   const [passwordData, setPasswordData] = useState({
     oldPassword: '',
     newPassword: '',
@@ -86,7 +84,6 @@ const ProfilePage: React.FC = () => {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -101,7 +98,6 @@ const ProfilePage: React.FC = () => {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,

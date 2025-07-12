@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Toaster } from './components/ui/toaster';
@@ -17,7 +15,8 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import BookingPage from './pages/booking/BookingPage';
 import MyReservationsPage from './pages/reservations/MyReservationsPage';
-import ProfilePage from './pages/profile/ProfilePage'; // Import ProfilePage
+import ProfilePage from './pages/profile/ProfilePage'; 
+import GuestRoute from './components/auth/GuestRoute';
 
 
 function AnimatedRoutes() {
@@ -27,8 +26,22 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>
         
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route 
+                path="/login" 
+                element={
+                  <GuestRoute>
+                    <LoginPage />
+                  </GuestRoute>
+                } 
+              />
+        <Route 
+                path="/register" 
+                element={
+                  <GuestRoute>
+                    <RegisterPage />
+                  </GuestRoute>
+                } 
+              />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/auth/verify" element={<VerifyEmailPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />

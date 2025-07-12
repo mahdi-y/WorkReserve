@@ -5,7 +5,6 @@ import { Button } from '../ui/button';
 import {
   Home,
   Building2,
-  Calendar,
   BookOpen,
   Settings,
   User,
@@ -42,7 +41,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Browse Rooms', href: '/rooms', icon: Building2 },
-    { name: 'Make Booking', href: '/booking', icon: Calendar },
     { name: 'My Reservations', href: '/reservations', icon: BookOpen },
     { name: 'Profile', href: '/profile', icon: User },
     { name: 'Settings', href: '/settings', icon: Settings },
