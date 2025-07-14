@@ -4,6 +4,22 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="src/assets/images/workreserve-icon-logo.png" sizes="15x15"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Add Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <!-- Debug script -->
+    <script>
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          console.log('Google object after page load:', window.google);
+          if (window.google) {
+            console.log('Google accounts:', window.google.accounts);
+          }
+        }, 2000);
+      });
+    </script>
+    
     <title>WorkReserve</title>
   </head>
   <body>

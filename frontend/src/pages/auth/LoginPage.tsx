@@ -46,8 +46,8 @@ const LoginPage: React.FC = () => {
             </li>
           </ul>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-10 h-full">
-          <div className="flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center justify-center p-10 h-full space-y-8">
+          <div className="flex flex-col items-center text-center">
             <span>
               <img
                 src="/src/assets/images/workreserve-icon-logo1.png"
@@ -58,37 +58,15 @@ const LoginPage: React.FC = () => {
             <h1 className="text-4xl font-bold text-gray-900 mb-2 mt--3">
               WorkReserve
             </h1>
-            <p className="text-gray-600 mb-2">
+            <p className="text-gray-600">
               Workspace Reservation System
             </p>
           </div>
-          <div className="w-full max-w-md mb-4 mt-8">
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 w-full py-2 px-4 border border-gray-300 rounded-md bg-white/80 hover:bg-gray-50 transition"
-              >
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5 align-middle" />
-                <span className="font-medium text-gray-700">Sign in with Google</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 w-full py-2 px-4 border border-gray-300 rounded-md bg-white/80 hover:bg-gray-50 transition"
-              >
-                <img src="https://www.svgrepo.com/show/448239/microsoft.svg" alt="Microsoft" className="w-5 h-5 align-middle" />
-                <span className="font-medium text-gray-700">Sign in with Microsoft</span>
-              </button>
-            </div>
-            <div className="flex items-center my-4">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="mx-2 text-gray-400 text-xs">or</span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-          </div>
-          <div className="shadow-xl rounded-xl bg-white/70 backdrop-blur-md w-full max-w-md">
+          
+          <div className="shadow-xl rounded-xl bg-white/70 backdrop-blur-md w-full max-w-md p-4">
             <LoginForm />
           </div>
-          <div className="text-center text-xs text-gray-400 mt-4">
+          <div className="text-center text-xs text-gray-400">
             &copy; {new Date().getFullYear()} WorkReserve. All rights reserved.
           </div>
         </div>

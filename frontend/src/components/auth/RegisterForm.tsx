@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useGoogleAuth } from "../../hooks/useGoogleAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -27,7 +29,12 @@ const RegisterForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
+  const { initializeGoogleAuth, signInWithGoogle } = useGoogleAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    initializeGoogleAuth();
+  }, [initializeGoogleAuth]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -59,7 +66,6 @@ const RegisterForm: React.FC = () => {
         "Registration successful! Please check your email to verify your account."
       );
       setTimeout(() => navigate("/login"), 3000);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(
         err.response?.data?.message ||
@@ -69,6 +75,10 @@ const RegisterForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleSignUp = () => {
+    signInWithGoogle();
   };
 
   return (
@@ -104,6 +114,7 @@ const RegisterForm: React.FC = () => {
                 value={formData.firstName}
                 onChange={handleChange}
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -115,6 +126,7 @@ const RegisterForm: React.FC = () => {
                 value={formData.lastName}
                 onChange={handleChange}
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -129,6 +141,7 @@ const RegisterForm: React.FC = () => {
               value={formData.email}
               onChange={handleChange}
               required
+              disabled={loading}
             />
           </div>
 
@@ -142,6 +155,7 @@ const RegisterForm: React.FC = () => {
               value={formData.password}
               onChange={handleChange}
               required
+              disabled={loading}
             />
           </div>
 
@@ -155,6 +169,7 @@ const RegisterForm: React.FC = () => {
               value={formData.confirmPassword}
               onChange={handleChange}
               required
+              disabled={loading}
             />
           </div>
 
@@ -163,11 +178,38 @@ const RegisterForm: React.FC = () => {
             {loading ? "Creating account..." : "Create account"}
           </Button>
 
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-muted-foreground">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleSignUp}
+            disabled={loading}
+          >
+            <img
+              src="https://www.svgrepo.com/show/475656/google-color.svg"
+              alt="Google"
+              className="w-5 h-5 mr-2"
+            />
+            Sign up with Google
+          </Button>
+
           <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Already have an account? </span>
             <Link
               to="/login"
-              className="text-blue-600 hover:underline font-medium">
+              className="text-blue-600 hover:underline font-medium"
+            >
               Sign in
             </Link>
           </div>

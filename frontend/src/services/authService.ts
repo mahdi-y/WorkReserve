@@ -47,6 +47,18 @@ export const authService = {
     return { user, token };
   },
 
+  loginWithGoogle: async (idToken: string): Promise<{ user: User; token: string }> => {
+    const response = await api.post('/auth/google', { idToken });
+    const { token, user } = response.data;
+    
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    return { user, token };
+  },
+
   logout: (): void => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');

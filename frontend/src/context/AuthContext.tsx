@@ -1,22 +1,24 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { authService, type User, type LoginCredentials, type RegisterData } from '../services/authService';
+import { authService, type LoginCredentials, type RegisterData, type User } from '../services/authService';
 
 interface AuthContextType {
   user: User | null;
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
-  loading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
@@ -31,41 +33,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const currentUser = authService.getCurrentUser();
-        if (currentUser && authService.isAuthenticated()) {
-          setUser(currentUser);
+    const initializeAuth = () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      if (token && userData) {
+        try {
+          const parsedUser = JSON.parse(userData);
+          setUser(parsedUser);
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
         }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-        authService.logout();
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
 
     initializeAuth();
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
-    try {
-      const response = await authService.login(credentials);
-      setUser(response.user);
-      console.log('Login successful, user set:', response.user);
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
+    const { user, token } = await authService.login(credentials);
+    setUser(user);
+  };
+
+  const loginWithGoogle = async (idToken: string) => {
+    const { user, token } = await authService.loginWithGoogle(idToken);
+    setUser(user);
   };
 
   const register = async (userData: RegisterData) => {
-    try {
-      await authService.register(userData);
-    } catch (error) {
-      console.error('Registration failed:', error);
-      throw error;
-    }
+    await authService.register(userData);
   };
 
   const logout = () => {
@@ -76,11 +75,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     user,
     login,
+    loginWithGoogle,
     register,
     logout,
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'ADMIN',
     loading,
-    isAuthenticated: !!user && authService.isAuthenticated(),
-    isAdmin: user?.role === 'ADMIN'
   };
 
   return (

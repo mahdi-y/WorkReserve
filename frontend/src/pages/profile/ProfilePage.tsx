@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
-  const { user, logout } = useAuth();
+  useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
