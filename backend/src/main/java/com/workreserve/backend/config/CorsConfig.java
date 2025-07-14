@@ -17,7 +17,7 @@ public class CorsConfig {
         
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000"
-            // "https://workreserve.com"
+             // "https://workreserve.com"
         ));
         
         configuration.setAllowedMethods(Arrays.asList(

@@ -2,6 +2,7 @@ package com.workreserve.backend.auth;
 
 import com.workreserve.backend.user.UserService;
 import com.workreserve.backend.user.DTO.*;
+import com.workreserve.backend.auth.DTO.GoogleAuthRequest;
 import com.workreserve.backend.exception.UserException; 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,9 @@ public class AuthController {
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private GoogleOAuthService googleOAuthService;
 
     @Operation(summary = "Register a new user", description = "Create a new user account with email verification")
     @ApiResponses(value = {
@@ -44,6 +48,18 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponseToken> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(userService.loginUser(request));
+    }
+
+    @Operation(summary = "Google OAuth Login/Register", description = "Authenticate or register user with Google OAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Google authentication successful",
+                content = @Content(schema = @Schema(implementation = AuthResponseToken.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid Google ID token"),
+        @ApiResponse(responseCode = "403", description = "Account is banned or locked")
+    })
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponseToken> googleAuth(@Valid @RequestBody GoogleAuthRequest request) {
+        return ResponseEntity.ok(googleOAuthService.authenticateWithGoogle(request.getIdToken()));
     }
 
     @Operation(summary = "Verify email", description = "Verify user email address with the provided token")
