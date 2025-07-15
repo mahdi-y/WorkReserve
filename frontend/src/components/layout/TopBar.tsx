@@ -13,23 +13,42 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setDarkMode(isDark);
+    const initializeTheme = () => {
+      const savedTheme = localStorage.getItem('workreserve-theme');
+      
+      if (savedTheme === 'dark' || savedTheme === 'light') {
+        const isDark = savedTheme === 'dark';
+        setDarkMode(isDark);
+        applyTheme(isDark);
+      } else {
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setDarkMode(systemPrefersDark);
+        applyTheme(systemPrefersDark);
+        localStorage.setItem('workreserve-theme', systemPrefersDark ? 'dark' : 'light');
+      }
+    };
+
+    initializeTheme();
   }, []);
 
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    
-    if (newDarkMode) {
+  const applyTheme = (isDark: boolean) => {
+    if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
   };
 
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    applyTheme(newDarkMode);
+    
+    localStorage.setItem('workreserve-theme', newDarkMode ? 'dark' : 'light');
+  };
+
   return (
-    <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+    <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
       <Button
         variant="ghost"
         size="sm"
@@ -61,7 +80,9 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
             variant="ghost"
             size="sm"
             onClick={toggleDarkMode}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+            title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
           >
             {darkMode ? (
               <Sun className="h-5 w-5" />
@@ -84,7 +105,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200 dark:lg:bg-gray-700" />
 
           <div className="flex items-center gap-x-2">
-            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white text-sm font-medium shadow-lg">
               {user?.fullName?.charAt(0)}
             </div>
             <span className="hidden lg:flex lg:items-center">
