@@ -17,7 +17,7 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showTwoFactor, setShowTwoFactor] = useState(false); // Add this state
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
   const { login } = useAuth();
   const { signInWithGoogle } = useGoogleAuth();
   const navigate = useNavigate();

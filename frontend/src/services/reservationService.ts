@@ -4,6 +4,7 @@ export interface Reservation {
   id: number;
   slotId: number;
   userId: number;
+  userName: string;
   teamSize: number;
   totalCost: number;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
