@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
+import { twoFactorService } from '../../services/twoFactorService';
+import TwoFactorLoginForm from './TwoFactorLoginForm';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -10,17 +12,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { useToast } from '../../hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
-
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false); // Add this state
   const { login } = useAuth();
   const { signInWithGoogle } = useGoogleAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +38,14 @@ const LoginForm: React.FC = () => {
     setLoading(true);
     
     try {
+      const { twoFactorRequired } = await twoFactorService.checkRequired(email);
+      
+      if (twoFactorRequired) {
+        setShowTwoFactor(true);
+        setLoading(false);
+        return;
+      }
+
       await login({ email, password });
       
       toast({
@@ -72,6 +81,20 @@ const LoginForm: React.FC = () => {
   const handleGoogleSignIn = () => {
     signInWithGoogle();
   };
+
+  const handleBackFrom2FA = () => {
+    setShowTwoFactor(false);
+  };
+
+  if (showTwoFactor) {
+    return (
+      <TwoFactorLoginForm 
+        email={email}
+        password={password}
+        onBack={handleBackFrom2FA}
+      />
+    );
+  }
 
   return (
     <Card className="border-0 shadow-none bg-transparent">

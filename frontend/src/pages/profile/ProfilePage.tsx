@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import TwoFactorSetupForm from '../../components/auth/TwoFactorSetupForm';
 
 const ProfilePage: React.FC = () => {
   useAuth();
@@ -396,127 +397,203 @@ const ProfilePage: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="w-5 h-5" />
-                  Change Password
-                </CardTitle>
-                <CardDescription>
-                  Update your password to keep your account secure
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="oldPassword">Current Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="oldPassword"
-                      name="oldPassword"
-                      type={showPasswords.current ? "text" : "password"}
-                      value={passwordData.oldPassword}
-                      onChange={handlePasswordInputChange}
-                      placeholder="Enter current password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => togglePasswordVisibility('current')}
-                    >
-                      {showPasswords.current ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {errors.oldPassword && (
-                    <p className="text-sm text-red-600">{errors.oldPassword}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="newPassword"
-                      name="newPassword"
-                      type={showPasswords.new ? "text" : "password"}
-                      value={passwordData.newPassword}
-                      onChange={handlePasswordInputChange}
-                      placeholder="Enter new password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => togglePasswordVisibility('new')}
-                    >
-                      {showPasswords.new ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {errors.newPassword && (
-                    <p className="text-sm text-red-600">{errors.newPassword}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type={showPasswords.confirm ? "text" : "password"}
-                      value={passwordData.confirmPassword}
-                      onChange={handlePasswordInputChange}
-                      placeholder="Confirm new password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => togglePasswordVisibility('confirm')}
-                    >
-                      {showPasswords.confirm ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-red-600">{errors.confirmPassword}</p>
-                  )}
-                </div>
-
-                <div className="flex justify-end pt-4 border-t">
-                  <Button
-                    onClick={handleChangePassword}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Changing...
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4 mr-2" />
-                        Change Password
-                      </>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Lock className="w-5 h-5" />
+                    Change Password
+                  </CardTitle>
+                  <CardDescription>
+                    Update your password to keep your account secure
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="oldPassword">Current Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="oldPassword"
+                        name="oldPassword"
+                        type={showPasswords.current ? "text" : "password"}
+                        value={passwordData.oldPassword}
+                        onChange={handlePasswordInputChange}
+                        placeholder="Enter current password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => togglePasswordVisibility('current')}
+                      >
+                        {showPasswords.current ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {errors.oldPassword && (
+                      <p className="text-sm text-red-600">{errors.oldPassword}</p>
                     )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="newPassword"
+                        name="newPassword"
+                        type={showPasswords.new ? "text" : "password"}
+                        value={passwordData.newPassword}
+                        onChange={handlePasswordInputChange}
+                        placeholder="Enter new password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => togglePasswordVisibility('new')}
+                      >
+                        {showPasswords.new ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {errors.newPassword && (
+                      <p className="text-sm text-red-600">{errors.newPassword}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showPasswords.confirm ? "text" : "password"}
+                        value={passwordData.confirmPassword}
+                        onChange={handlePasswordInputChange}
+                        placeholder="Confirm new password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => togglePasswordVisibility('confirm')}
+                      >
+                        {showPasswords.confirm ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {errors.confirmPassword && (
+                      <p className="text-sm text-red-600">{errors.confirmPassword}</p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t">
+                    <Button
+                      onClick={handleChangePassword}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Changing...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4 mr-2" />
+                          Change Password
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Two-Factor Authentication
+                  </CardTitle>
+                  <CardDescription>
+                    Add an extra layer of security to your account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {profile?.twoFactorEnabled ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="font-medium text-green-900 dark:text-green-100">
+                              2FA is enabled
+                            </p>
+                            <p className="text-sm text-green-700 dark:text-green-300">
+                              Your account is protected with 2FA
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            toast({
+                              title: "Feature Coming Soon",
+                              description: "Backup codes management will be available soon",
+                            });
+                          }}
+                        >
+                          View Backup Codes
+                        </Button>
+                        <Button 
+                          variant="destructive"
+                          onClick={() => {
+                            toast({
+                              title: "Feature Coming Soon",
+                              description: "2FA disable will be available soon",
+                            });
+                          }}
+                        >
+                          Disable 2FA
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                          <div>
+                            <p className="font-medium text-yellow-900 dark:text-yellow-100">
+                              2FA is not enabled
+                            </p>
+                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                              We recommend enabling 2FA for better security
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <TwoFactorSetupForm onEnabled={loadProfile} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="account">

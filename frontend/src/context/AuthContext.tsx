@@ -6,6 +6,7 @@ import { authService, type LoginCredentials, type RegisterData, type User } from
 interface AuthContextType {
   user: User | null;
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginDirect: (user: User, token: string) => void;
   loginWithGoogle: (idToken: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
@@ -58,6 +59,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(user);
   };
 
+  const loginDirect = (user: User, token: string) => {
+    setUser(user);
+  };
+
   const loginWithGoogle = async (idToken: string) => {
     const { user, token } = await authService.loginWithGoogle(idToken);
     setUser(user);
@@ -75,6 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     user,
     login,
+    loginDirect,
     loginWithGoogle,
     register,
     logout,

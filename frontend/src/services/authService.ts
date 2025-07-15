@@ -17,6 +17,7 @@ export interface User {
   email: string;
   role: 'USER' | 'ADMIN';
   emailVerified: boolean;
+  twoFactorEnabled: boolean;
 }
 
 export interface AuthResponse {

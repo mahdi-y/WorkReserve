@@ -20,6 +20,7 @@ export interface UserProfile {
   createdAt: string;
   banned: boolean;
   locked: boolean;
+  twoFactorEnabled: boolean; 
 }
 
 export const profileService = {
