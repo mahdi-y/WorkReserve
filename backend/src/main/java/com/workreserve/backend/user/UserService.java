@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.Authentication;
-import com.workreserve.backend.activity.ActivityService;
+import com.workreserve.backend.auth.TwoFactorService;
+import com.workreserve.backend.auth.DTO.TwoFactorLoginRequest;
 
 
 @Service
@@ -50,9 +50,10 @@ public class UserService implements UserDetailsService {
     @Autowired
     private ActivityService activityService;
 
-    private static final int MAX_FAILED_ATTEMPTS = 5;
+    @Autowired
+    private TwoFactorService twoFactorService;
 
-    
+    private static final int MAX_FAILED_ATTEMPTS = 5;
 
     public UserService(
         UserRepository userRepository,
@@ -182,6 +183,69 @@ public class UserService implements UserDetailsService {
         return new AuthResponseToken(accessToken, refreshToken, toUserResponse(user));
     }
 
+    public AuthResponseToken loginUserWith2FA(TwoFactorLoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new UserException("Invalid credentials"));
+
+        if (user.isLocked()) {
+            throw new UserException("Account is locked. Please check your email to unlock.");
+        }
+
+        if (user.isBanned()) {
+            throw new UserException("Your account has been banned! Please contact support.");
+        }
+
+        try {
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (Exception ex) {
+            handleFailedLogin(user);
+            throw new UserException("Invalid credentials");
+        }
+
+        if (!twoFactorService.verifyCode(user.getTwoFactorSecret(), request.getTwoFactorCode()) &&
+            !twoFactorService.useBackupCode(user, request.getTwoFactorCode())) {
+            throw new UserException("Invalid 2FA code");
+        }
+
+        user.setFailedLoginAttempts(0);
+        user.setAccountLockedAt(null);
+        userRepository.save(user);
+
+        if (!user.isEmailVerified()) {
+            throw new UserException("Email not verified. Please check your inbox.");
+        }
+
+        String accessToken = jwtService.generateToken(user.getEmail());
+        String refreshToken = UUID.randomUUID().toString();
+        user.setRefreshToken(refreshToken);
+        user.setRefreshTokenExpiry(LocalDateTime.now().plusDays(7));
+        userRepository.save(user);
+
+        return new AuthResponseToken(accessToken, refreshToken, toUserResponse(user));
+    }
+
+    public boolean requiresTwoFactor(String email) {
+        User user = userRepository.findByEmail(email).orElse(null);
+        return user != null && user.getTwoFactorEnabled();
+    }
+
+    private void handleFailedLogin(User user) {
+        user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
+        if (user.getFailedLoginAttempts() >= MAX_FAILED_ATTEMPTS) {
+            user.setLocked(true);
+            user.setAccountLockedAt(LocalDateTime.now());
+            String unlockToken = UUID.randomUUID().toString();
+            user.setUnlockToken(unlockToken);
+            user.setUnlockTokenCreatedAt(LocalDateTime.now());
+            userRepository.save(user);
+            emailService.sendAccountUnlockEmail(user.getEmail(), user.getFullName(), unlockToken);
+            throw new UserException("Account locked due to too many failed login attempts. Check your email to unlock.");
+        }
+        userRepository.save(user);
+    }
+
     @CacheEvict(value = {"users", "current-user"}, allEntries = true)
     public UserResponse updateUser(Long id, RegisterRequest request) {
         User user = userRepository.findById(id)
@@ -278,6 +342,7 @@ public class UserService implements UserDetailsService {
         response.setLocked(user.isLocked());
         response.setBanned(user.isBanned());
         response.setEmailVerified(user.isEmailVerified());
+        response.setTwoFactorEnabled(user.getTwoFactorEnabled() != null ? user.getTwoFactorEnabled() : false);
         return response;
     }
 
@@ -427,5 +492,5 @@ public class UserService implements UserDetailsService {
 
         return toUserResponse(updatedUser);
     }
-
+    
 }

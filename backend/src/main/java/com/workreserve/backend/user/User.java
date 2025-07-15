@@ -2,6 +2,7 @@ package com.workreserve.backend.user;
 
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
@@ -43,6 +44,16 @@ public class User implements UserDetails {
     private LocalDateTime refreshTokenExpiry;
     private boolean banned = false;
 
+    @Column(nullable = false)
+    private Boolean twoFactorEnabled = false;
+    
+    @JsonIgnore
+    private String twoFactorSecret;
+    
+    @JsonIgnore
+    private String backupCodes; 
+    
+    private LocalDateTime twoFactorEnabledAt;
 
     @PrePersist
     protected void onCreate() {
@@ -75,6 +86,19 @@ public class User implements UserDetails {
 
     public boolean isEmailVerified() { return emailVerified; }
     public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+    
+    public Boolean getTwoFactorEnabled() { return twoFactorEnabled; }
+    public void setTwoFactorEnabled(Boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; }
+
+    public String getTwoFactorSecret() { return twoFactorSecret; }
+    public void setTwoFactorSecret(String twoFactorSecret) { this.twoFactorSecret = twoFactorSecret; }
+
+    public String getBackupCodes() { return backupCodes; }
+    public void setBackupCodes(String backupCodes) { this.backupCodes = backupCodes; }
+
+    public LocalDateTime getTwoFactorEnabledAt() { return twoFactorEnabledAt; }
+    public void setTwoFactorEnabledAt(LocalDateTime twoFactorEnabledAt) { this.twoFactorEnabledAt = twoFactorEnabledAt; }
+
     public String getVerificationToken() { return verificationToken; }
     public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
 

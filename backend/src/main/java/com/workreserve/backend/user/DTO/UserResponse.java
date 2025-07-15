@@ -13,6 +13,8 @@ public class UserResponse {
     private boolean locked;
     private boolean banned;
     private boolean emailVerified;
+    private boolean twoFactorEnabled;
+
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -40,4 +42,7 @@ public class UserResponse {
 
     public boolean isEmailVerified() { return emailVerified; }
     public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public boolean isTwoFactorEnabled() { return twoFactorEnabled; }
+    public void setTwoFactorEnabled(boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; }
 }

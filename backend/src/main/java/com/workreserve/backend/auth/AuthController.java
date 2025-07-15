@@ -3,6 +3,7 @@ package com.workreserve.backend.auth;
 import com.workreserve.backend.user.UserService;
 import com.workreserve.backend.user.DTO.*;
 import com.workreserve.backend.auth.DTO.GoogleAuthRequest;
+import com.workreserve.backend.auth.DTO.TwoFactorLoginRequest;
 import com.workreserve.backend.exception.UserException; 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -138,5 +140,18 @@ public class AuthController {
     @PostMapping("/refresh-token")
     public ResponseEntity<AuthResponseToken> refreshToken(@RequestParam String refreshToken) {
         return ResponseEntity.ok(userService.refreshToken(refreshToken));
+    }
+
+    @Operation(summary = "Login with 2FA", description = "Complete login with 2FA verification")
+    @PostMapping("/login/2fa")
+    public ResponseEntity<AuthResponseToken> loginWith2FA(@Valid @RequestBody TwoFactorLoginRequest request) {
+        return ResponseEntity.ok(userService.loginUserWith2FA(request));
+    }
+
+    @Operation(summary = "Check if 2FA is required", description = "Check if user has 2FA enabled")
+    @PostMapping("/check-2fa")
+    public ResponseEntity<Map<String, Boolean>> check2FA(@RequestParam String email) {
+        boolean required = userService.requiresTwoFactor(email);
+        return ResponseEntity.ok(Map.of("twoFactorRequired", required));
     }
 }
