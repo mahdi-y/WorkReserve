@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
@@ -11,11 +12,10 @@ import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { useAuth } from '../../context/AuthContext';
-import { profileService, type ProfileUpdateData, type UserProfile, type PasswordChangeData } from '../../services/profileService';
+import { profileService, type ProfileUpdateData, type UserProfile } from '../../services/profileService';
 import { useToast } from '../../hooks/use-toast';
 import {
   User,
-  Mail,
   Shield,
   Calendar,
   Lock,
@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import TwoFactorSetupForm from '../../components/auth/TwoFactorSetupForm';
 
 const ProfilePage: React.FC = () => {
@@ -54,6 +55,7 @@ const ProfilePage: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [show2FAModal, setShow2FAModal] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -550,23 +552,19 @@ const ProfilePage: React.FC = () => {
                       <div className="flex gap-3">
                         <Button 
                           variant="outline"
-                          onClick={() => {
-                            toast({
-                              title: "Feature Coming Soon",
-                              description: "Backup codes management will be available soon",
-                            });
-                          }}
+                          onClick={() => toast({
+                            title: "Feature Coming Soon",
+                            description: "Backup codes management will be available soon",
+                          })}
                         >
                           View Backup Codes
                         </Button>
                         <Button 
                           variant="destructive"
-                          onClick={() => {
-                            toast({
-                              title: "Feature Coming Soon",
-                              description: "2FA disable will be available soon",
-                            });
-                          }}
+                          onClick={() => toast({
+                            title: "Feature Coming Soon",
+                            description: "2FA disable will be available soon",
+                          })}
                         >
                           Disable 2FA
                         </Button>
@@ -588,7 +586,13 @@ const ProfilePage: React.FC = () => {
                         </div>
                       </div>
                       
-                      <TwoFactorSetupForm onEnabled={loadProfile} />
+                      <Button 
+                        onClick={() => setShow2FAModal(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <Shield className="w-4 h-4" />
+                        Enable 2FA
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -678,6 +682,20 @@ const ProfilePage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </motion.div>
+
+      <Dialog open={show2FAModal} onOpenChange={setShow2FAModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enable Two-Factor Authentication</DialogTitle>
+          </DialogHeader>
+          <TwoFactorSetupForm
+            onBackupCodesConfirmed={() => {
+              setShow2FAModal(false);
+              loadProfile();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

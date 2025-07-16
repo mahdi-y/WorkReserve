@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
@@ -11,7 +10,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const { user } = useAuth();
+
+  useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

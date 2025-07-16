@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
-import { twoFactorService } from '../../services/twoFactorService';
 import TwoFactorLoginForm from './TwoFactorLoginForm';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -38,13 +37,6 @@ const LoginForm: React.FC = () => {
     setLoading(true);
     
     try {
-      const { twoFactorRequired } = await twoFactorService.checkRequired(email);
-      
-      if (twoFactorRequired) {
-        setShowTwoFactor(true);
-        setLoading(false);
-        return;
-      }
 
       await login({ email, password });
       
@@ -57,6 +49,12 @@ const LoginForm: React.FC = () => {
       
     } catch (error: any) {
       console.error('Login error:', error);
+      
+      if (error.response?.status === 403 && error.response?.data?.twoFactorRequired) {
+        setShowTwoFactor(true);
+        setLoading(false);
+        return;
+      }
       
       let errorMessage = 'Login failed. Please try again.';
       

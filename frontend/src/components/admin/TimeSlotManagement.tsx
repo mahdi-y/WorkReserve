@@ -76,7 +76,6 @@ const calendarStyles = `
     cursor: pointer;
   }
   
-  /* Add these cursor styles for interactive elements */
   .rbc-time-slot:hover {
     cursor: crosshair;
     background-color: rgba(59, 130, 246, 0.05) !important;
