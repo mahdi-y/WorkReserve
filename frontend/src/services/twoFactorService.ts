@@ -36,10 +36,11 @@ export const twoFactorService = {
     return response.data;
   },
 
-  enable: async (secret: string, code: string): Promise<void> => {
-    await api.post('/auth/2fa/enable', { code }, {
+  enable: async (secret: string, code: string): Promise<{ backupCodes: string[] }> => {
+    const response = await api.post('/auth/2fa/enable', { code }, {
       params: { secret }
     });
+    return response.data;
   },
 
   disable: async (code: string): Promise<void> => {

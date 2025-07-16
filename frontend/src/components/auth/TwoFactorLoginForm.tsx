@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { twoFactorService } from '../../services/twoFactorService';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Shield, ArrowLeft } from 'lucide-react';
+import { Shield, ArrowLeft, Key } from 'lucide-react';
 
 interface TwoFactorLoginFormProps {
   email: string;
@@ -25,12 +25,13 @@ const TwoFactorLoginForm: React.FC<TwoFactorLoginFormProps> = ({
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!code.trim()) {
-      setError('Please enter your 2FA code');
+      setError(`Please enter your ${useBackupCode ? 'backup code' : '2FA code'}`);
       return;
     }
 
@@ -49,24 +50,37 @@ const TwoFactorLoginForm: React.FC<TwoFactorLoginFormProps> = ({
     } catch (err: any) {
       setError(
         err.response?.data?.message || 
-        'Invalid 2FA code'
+        `Invalid ${useBackupCode ? 'backup code' : '2FA code'}`
       );
     } finally {
       setLoading(false);
     }
   };
 
+  const toggleCodeType = () => {
+    setUseBackupCode(!useBackupCode);
+    setCode('');
+    setError('');
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div className="text-center">
         <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Shield className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          {useBackupCode ? (
+            <Key className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          ) : (
+            <Shield className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          )}
         </div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Two-Factor Authentication
+          {useBackupCode ? 'Backup Code' : 'Two-Factor Authentication'}
         </h2>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Enter the 6-digit code from your authenticator app
+          {useBackupCode 
+            ? 'Enter one of your backup codes'
+            : 'Enter the 6-digit code from your authenticator app'
+          }
         </p>
       </div>
 
@@ -79,27 +93,37 @@ const TwoFactorLoginForm: React.FC<TwoFactorLoginFormProps> = ({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="code">
-            Authentication Code
+            {useBackupCode ? 'Backup Code' : 'Authentication Code'}
           </Label>
           <Input
             id="code"
             type="text"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="000000"
-            className="text-center text-2xl tracking-widest"
-            maxLength={6}
+            onChange={(e) => {
+              if (useBackupCode) {
+                setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8));
+              } else {
+                setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+              }
+            }}
+            placeholder={useBackupCode ? 'XXXXXXXX' : '000000'}
+            className="text-center text-2xl tracking-widest font-mono"
+            maxLength={useBackupCode ? 8 : 6}
             disabled={loading}
             autoComplete="one-time-code"
           />
         </div>
 
         <div className="space-y-3">
-          <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={loading || code.length < (useBackupCode ? 8 : 6)}
+          >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Loading...
+                Verifying...
               </>
             ) : (
               'Verify & Sign In'
@@ -120,18 +144,16 @@ const TwoFactorLoginForm: React.FC<TwoFactorLoginFormProps> = ({
       </form>
 
       <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-        <p>Lost your device?</p>
         <button 
           type="button"
-          className="text-blue-600 hover:text-blue-500 font-medium"
-          onClick={() => {
-            const backupCode = prompt('Enter backup code:');
-            if (backupCode) {
-              setCode(backupCode);
-            }
-          }}
+          className="text-blue-600 hover:text-blue-500 font-medium hover:underline"
+          onClick={toggleCodeType}
+          disabled={loading}
         >
-          Use backup code
+          {useBackupCode 
+            ? 'Use authenticator app instead' 
+            : 'Use backup code instead'
+          }
         </button>
       </div>
     </div>

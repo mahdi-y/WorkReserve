@@ -20,6 +20,7 @@ const TwoFactorSetupForm: React.FC<TwoFactorSetupFormProps> = ({ onBackupCodesCo
   const [loading, setLoading] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [backupCodesShown, setBackupCodesShown] = useState(false);
+  const [actualBackupCodes, setActualBackupCodes] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchSetup = async () => {
@@ -42,9 +43,9 @@ const TwoFactorSetupForm: React.FC<TwoFactorSetupFormProps> = ({ onBackupCodesCo
     setLoading(true);
     setError('');
     try {
-      await twoFactorService.enable(setup!.secret, code);
+      const response = await twoFactorService.enable(setup!.secret, code);
+      setActualBackupCodes(response.backupCodes);
       setSuccess('Two-factor authentication enabled!');
-
       setShowBackupModal(true);
       setBackupCodesShown(true);
     } catch (err: any) {
@@ -55,8 +56,10 @@ const TwoFactorSetupForm: React.FC<TwoFactorSetupFormProps> = ({ onBackupCodesCo
   };
 
   const handleDownloadCodes = () => {
-    if (!setup?.backupCodes) return;
-    const content = `WorkReserve Backup Codes\n\n${setup.backupCodes.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nKeep these codes safe. Each code can only be used once.`;
+    const codesToDownload = actualBackupCodes.length > 0 ? actualBackupCodes : setup?.backupCodes || [];
+    if (codesToDownload.length === 0) return;
+    
+    const content = `WorkReserve Backup Codes\n\n${codesToDownload.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nKeep these codes safe. Each code can only be used once.`;
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -117,7 +120,7 @@ const TwoFactorSetupForm: React.FC<TwoFactorSetupFormProps> = ({ onBackupCodesCo
               Each code can only be used once.
             </p>
             <div className="grid grid-cols-2 gap-2 mb-2 w-full max-w-xs mx-auto">
-              {setup.backupCodes.map(code => (
+              {(actualBackupCodes.length > 0 ? actualBackupCodes : setup?.backupCodes || []).map(code => (
                 <div key={code} className="font-mono text-sm text-center p-2 bg-gray-100 dark:bg-gray-700 rounded">
                   {code}
                 </div>
