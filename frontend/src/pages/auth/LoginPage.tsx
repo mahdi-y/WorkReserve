@@ -48,22 +48,35 @@ const LoginPage: React.FC = () => {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-hidden transition-colors"
+      className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-950 overflow-hidden transition-colors"
       style={{
         backgroundImage: `url(${topography})`,
         backgroundRepeat: 'repeat',
-        backgroundSize: 'cover',
+        backgroundSize: '400px 400px',
+        backgroundBlendMode: darkMode ? 'overlay' : 'normal',
+        opacity: darkMode ? 0.9 : 1,
       }}
     >
-      <div className="absolute -top-32 -left-32 w-[400px] h-[400px] bg-blue-200/40 dark:bg-blue-900/40 rounded-full blur-2xl z-0" />
-      <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] bg-indigo-100/40 dark:bg-indigo-900/40 rounded-full blur-2xl z-0" style={{ transform: 'translate(-50%, -50%)' }} />
-      <div className="absolute bottom-0 right-0 w-[350px] h-[350px] bg-blue-100/40 dark:bg-blue-900/40 rounded-full blur-2xl z-0" />
+      <div 
+        className="absolute inset-0 z-0 dark:opacity-40 opacity-0 transition-opacity"
+        style={{
+          backgroundImage: `url(${topography})`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: '300px 300px',
+          filter: 'invert(1) contrast(1.5)',
+        }}
+      />
+      
+      <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-blue-300/25 dark:bg-blue-400/15 rounded-full blur-3xl z-0" />
+      <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-indigo-200/25 dark:bg-indigo-400/15 rounded-full blur-3xl z-0" style={{ transform: 'translate(-50%, -50%)' }} />
+      <div className="absolute bottom-0 right-0 w-[450px] h-[450px] bg-purple-200/25 dark:bg-purple-400/15 rounded-full blur-3xl z-0" />
+      <div className="absolute top-20 right-20 w-[250px] h-[250px] bg-cyan-200/15 dark:bg-cyan-400/10 rounded-full blur-2xl z-0" />
       
       <Button
         variant="ghost"
         size="sm"
         onClick={toggleTheme}
-        className="absolute top-4 right-4 z-20 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+        className="absolute top-4 right-4 z-20 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 transition-colors backdrop-blur-sm bg-white/15 dark:bg-gray-800/15 rounded-full"
         aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
         title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
       >
@@ -74,14 +87,14 @@ const LoginPage: React.FC = () => {
         )}
       </Button>
 
-      <div className="relative flex w-full max-w-7xl h-[1000px] shadow-2xl rounded-2xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-md overflow-hidden z-10">
-        <div className="hidden md:flex flex-1 flex-col justify-center items-center bg-blue-100/60 dark:bg-blue-900/60 p-10 h-full">
+      <div className="relative flex w-full max-w-7xl h-[1000px] shadow-2xl rounded-2xl bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm overflow-hidden z-10 border border-white/10 dark:border-gray-700/10">
+        <div className="hidden md:flex flex-1 flex-col justify-center items-center bg-gradient-to-br from-blue-100/40 to-indigo-100/40 dark:from-blue-900/20 dark:to-indigo-900/20 p-10 h-full backdrop-blur-sm">
           <img
             src="/src/assets/images/meeting-illustration.jpg"
             alt="Workspace"
-            className="w-72 mb-6 rounded-xl shadow"
+            className="w-72 mb-6 rounded-xl shadow-lg"
           />
-          <h2 className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2">
+          <h2 className="text-3xl font-bold text-blue-700 dark:text-blue-200 mb-2">
             Welcome to WorkReserve
           </h2>
           <ul className="text-blue-900 dark:text-blue-100 space-y-2 text-lg">
@@ -111,15 +124,15 @@ const LoginPage: React.FC = () => {
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 mt--3">
               WorkReserve
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 dark:text-gray-300">
               Workspace Reservation System
             </p>
           </div>
           
-          <div className="shadow-xl rounded-xl bg-white/70 dark:bg-gray-800/70 backdrop-blur-md w-full max-w-md p-4">
+          <div className="shadow-xl rounded-xl bg-white/25 dark:bg-gray-800/25 backdrop-blur-sm w-full max-w-md p-4 border border-white/15 dark:border-gray-700/15">
             <LoginForm />
           </div>
-          <div className="text-center text-xs text-gray-400 dark:text-gray-500">
+          <div className="text-center text-xs text-gray-500 dark:text-gray-400">
             &copy; {new Date().getFullYear()} WorkReserve. All rights reserved.
           </div>
         </div>

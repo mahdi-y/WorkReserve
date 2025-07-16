@@ -82,10 +82,12 @@ const RegisterForm: React.FC = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="border-0 shadow-none bg-transparent">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl text-center">Create account</CardTitle>
-        <CardDescription className="text-center">
+        <CardTitle className="text-2xl text-center text-gray-900 dark:text-white">
+          Create account
+        </CardTitle>
+        <CardDescription className="text-center text-gray-600 dark:text-gray-400">
           Enter your information to create your account
         </CardDescription>
       </CardHeader>
@@ -183,7 +185,7 @@ const RegisterForm: React.FC = () => {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">
+              <span className="px-2 text-muted-foreground">
                 Or continue with
               </span>
             </div>
@@ -205,10 +207,12 @@ const RegisterForm: React.FC = () => {
           </Button>
 
           <div className="mt-6 text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
+            <span className="text-gray-600 dark:text-gray-400">
+              Already have an account?{" "}
+            </span>
             <Link
               to="/login"
-              className="text-blue-600 hover:underline font-medium"
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
             >
               Sign in
             </Link>
