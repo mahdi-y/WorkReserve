@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import com.workreserve.backend.config.MailService;
 import com.workreserve.backend.exception.TokenExpiredException;
+import com.workreserve.backend.exception.TwoFactorRequiredException;
 import com.workreserve.backend.exception.UserException;
 
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -154,19 +155,12 @@ public class UserService implements UserDetailsService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
         } catch (Exception ex) {
-            user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
-            if (user.getFailedLoginAttempts() >= MAX_FAILED_ATTEMPTS) {
-                user.setLocked(true);
-                user.setAccountLockedAt(LocalDateTime.now());
-                String unlockToken = UUID.randomUUID().toString();
-                user.setUnlockToken(unlockToken);
-                user.setUnlockTokenCreatedAt(LocalDateTime.now());
-                userRepository.save(user);
-                emailService.sendAccountUnlockEmail(user.getEmail(), user.getFullName(), unlockToken);
-                throw new UserException("Account locked due to too many failed login attempts. Check your email to unlock.");
-            }
-            userRepository.save(user);
+            handleFailedLogin(user);
             throw new UserException("Invalid credentials");
+        }
+
+        if (user.getTwoFactorEnabled()) {
+            throw new TwoFactorRequiredException("Two-factor authentication required");
         }
 
         user.setFailedLoginAttempts(0);

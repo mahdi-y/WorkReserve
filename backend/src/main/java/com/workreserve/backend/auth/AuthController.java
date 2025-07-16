@@ -4,6 +4,7 @@ import com.workreserve.backend.user.UserService;
 import com.workreserve.backend.user.DTO.*;
 import com.workreserve.backend.auth.DTO.GoogleAuthRequest;
 import com.workreserve.backend.auth.DTO.TwoFactorLoginRequest;
+import com.workreserve.backend.exception.TwoFactorRequiredException;
 import com.workreserve.backend.exception.UserException; 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -48,8 +49,15 @@ public class AuthController {
         @ApiResponse(responseCode = "429", description = "Too many login attempts")
     })
     @PostMapping("/login")
-    public ResponseEntity<AuthResponseToken> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(userService.loginUser(request));
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            AuthResponseToken response = userService.loginUser(request);
+            return ResponseEntity.ok(response);
+        } catch (TwoFactorRequiredException e) {
+            return ResponseEntity.status(403).body(Map.of("twoFactorRequired", true));
+        } catch (UserException e) {
+            return ResponseEntity.status(401).body(Map.of("message", e.getMessage()));
+        }
     }
 
     @Operation(summary = "Google OAuth Login/Register", description = "Authenticate or register user with Google OAuth")
