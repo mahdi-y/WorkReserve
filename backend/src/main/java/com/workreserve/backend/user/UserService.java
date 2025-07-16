@@ -198,9 +198,19 @@ public class UserService implements UserDetailsService {
             throw new UserException("Invalid credentials");
         }
 
-        if (!twoFactorService.verifyCode(user.getTwoFactorSecret(), request.getTwoFactorCode()) &&
-            !twoFactorService.useBackupCode(user, request.getTwoFactorCode())) {
-            throw new UserException("Invalid 2FA code");
+        boolean isValidCode = false;
+        String twoFactorCode = request.getTwoFactorCode();
+        
+        if (twoFactorCode.length() == 6 && twoFactorCode.matches("\\d+")) {
+            isValidCode = twoFactorService.verifyCode(user.getTwoFactorSecret(), twoFactorCode);
+        }
+        
+        if (!isValidCode && twoFactorCode.length() == 8) {
+            isValidCode = twoFactorService.useBackupCode(user, twoFactorCode);
+        }
+        
+        if (!isValidCode) {
+            throw new UserException("Invalid 2FA code or backup code");
         }
 
         user.setFailedLoginAttempts(0);

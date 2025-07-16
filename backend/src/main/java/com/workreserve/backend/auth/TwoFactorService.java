@@ -39,14 +39,14 @@ public class TwoFactorService {
     }
 
     public String generateOtpAuthUri(User user, String secret) {
-    return String.format(
-        "otpauth://totp/%s:%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
-        "WorkReserve",
-        user.getEmail(),
-        secret,
-        "WorkReserve"
-    );
-}
+        return String.format(
+            "otpauth://totp/%s:%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
+            "WorkReserve",
+            user.getEmail(),
+            secret,
+            "WorkReserve"
+        );
+    }
 
     public boolean verifyCode(String secret, String code) {
         if (secret == null || code == null) {
@@ -74,19 +74,22 @@ public class TwoFactorService {
                 new TypeReference<List<String>>() {}
             );
             
-            if (backupCodes.remove(code.toUpperCase())) {
+            String upperCode = code.toUpperCase();
+            
+            if (backupCodes.remove(upperCode)) {
                 user.setBackupCodes(objectMapper.writeValueAsString(backupCodes));
                 userRepository.save(user);
                 return true;
             }
             return false;
         } catch (Exception e) {
+            System.err.println("Error using backup code: " + e.getMessage());
             return false;
         }
     }
 
     @CacheEvict(value = {"users", "current-user"}, allEntries = true)
-    public void enableTwoFactor(User user, String secret, String verificationCode) {
+    public List<String> enableTwoFactor(User user, String secret, String verificationCode) {
         if (!verifyCode(secret, verificationCode)) {
             throw new UserException("Invalid verification code");
         }
@@ -99,6 +102,8 @@ public class TwoFactorService {
             user.setTwoFactorEnabledAt(LocalDateTime.now());
             user.setBackupCodes(objectMapper.writeValueAsString(backupCodes));
             userRepository.save(user);
+            
+            return backupCodes;
         } catch (Exception e) {
             throw new UserException("Failed to enable 2FA: " + e.getMessage());
         }

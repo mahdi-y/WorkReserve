@@ -5,8 +5,6 @@ import com.workreserve.backend.user.User;
 import com.workreserve.backend.user.UserService;
 import com.workreserve.backend.user.DTO.AuthResponseToken;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,13 +52,18 @@ public class TwoFactorController {
 
     @Operation(summary = "Enable 2FA")
     @PostMapping("/enable")
-    public ResponseEntity<String> enable2FA(
+    public ResponseEntity<Map<String, Object>> enable2FA(
             @AuthenticationPrincipal User user,
             @RequestParam String secret,
             @Valid @RequestBody TwoFactorVerificationRequest request) {
         
-        twoFactorService.enableTwoFactor(user, secret, request.getCode());
-        return ResponseEntity.ok("Two-factor authentication enabled successfully");
+        List<String> backupCodes = twoFactorService.enableTwoFactor(user, secret, request.getCode());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Two-factor authentication enabled successfully");
+        response.put("backupCodes", backupCodes);
+        
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Disable 2FA")
