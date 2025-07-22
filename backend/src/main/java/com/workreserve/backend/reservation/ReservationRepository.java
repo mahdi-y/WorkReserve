@@ -57,4 +57,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findByUserIdWithSlotAndUser(@Param("userId") Long userId);
 
     List<Reservation> findAllByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime date);
+
+    boolean existsBySlotId(Long slotId);
 }

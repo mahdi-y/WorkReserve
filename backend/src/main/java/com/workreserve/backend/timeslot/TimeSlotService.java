@@ -15,6 +15,7 @@ import com.workreserve.backend.reservation.ReservationStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -187,17 +188,28 @@ public class TimeSlotService {
         response.setStartTime(timeSlot.getStartTime());
         response.setEndTime(timeSlot.getEndTime());
         response.setRoom(roomService.getRoomById(timeSlot.getRoom().getId()));
-        
+
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        boolean isPast = timeSlot.getDate().isBefore(today) ||
+            (timeSlot.getDate().isEqual(today) && timeSlot.getEndTime().isBefore(now));
+
+        if (isPast) {
+            response.setAvailable(false);
+            response.setBookedByCurrentUser(false);
+            response.setBookedByUserName(null);
+            return response;
+        }
+
         Optional<Reservation> activeReservation = reservationRepository
             .findBySlotIdAndStatusNot(timeSlot.getId(), ReservationStatus.CANCELLED)
             .stream()
             .findFirst();
-        
+
         if (activeReservation.isPresent()) {
             response.setAvailable(false);
             Reservation reservation = activeReservation.get();
             response.setBookedByUserName(reservation.getUser().getFullName());
-            
             if (currentUserEmail != null) {
                 response.setBookedByCurrentUser(
                     reservation.getUser().getEmail().equals(currentUserEmail)
@@ -207,7 +219,7 @@ public class TimeSlotService {
             response.setAvailable(true);
             response.setBookedByCurrentUser(false);
         }
-        
+
         return response;
     }
 
@@ -264,5 +276,15 @@ public class TimeSlotService {
     private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null ? authentication.getName() : null;
+    }
+
+    @Scheduled(cron = "0 0 3 * * ?") 
+    public void deleteUnusedPastTimeSlots() {
+        LocalDate today = LocalDate.now();
+        List<TimeSlot> pastSlots = timeSlotRepository.findByDateBetween(LocalDate.of(1970, 1, 1), today.minusDays(1));
+        List<TimeSlot> deletable = pastSlots.stream()
+            .filter(slot -> !reservationRepository.existsBySlotId(slot.getId()))
+            .collect(Collectors.toList());
+        timeSlotRepository.deleteAll(deletable);
     }
 }
