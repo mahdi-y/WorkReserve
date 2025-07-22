@@ -47,6 +47,21 @@ const itemVariants = {
   }
 };
 
+const CustomPopup = ({ children, ...props }: any) => (
+  <div
+    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl p-4 max-w-sm z-50"
+    style={{
+      position: 'absolute',
+      zIndex: 9999,
+      boxShadow: '0 10px 25px rgba(0,0,0,0.15), 0 4px 6px rgba(0,0,0,0.1)',
+    }}
+  >
+    <div className="space-y-2">
+      {children}
+    </div>
+  </div>
+);
+
 const calendarStyles = `
   .rbc-calendar {
     background: white;
@@ -57,6 +72,62 @@ const calendarStyles = `
   .dark .rbc-calendar {
     background: rgb(17 24 39);
     color: rgb(243 244 246);
+  }
+  
+  /* Popup overlay styles for dark mode */
+  .rbc-overlay {
+    background: white !important;
+    border: 1px solid rgb(229 231 235) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15), 0 4px 6px rgba(0,0,0,0.1) !important;
+    padding: 1rem !important;
+    max-width: 300px !important;
+  }
+  
+  .dark .rbc-overlay {
+    background: rgb(31 41 55) !important;
+    border: 1px solid rgb(75 85 99) !important;
+    color: rgb(243 244 246) !important;
+  }
+  
+  .rbc-overlay-header {
+    border-bottom: 1px solid rgb(229 231 235) !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 600 !important;
+  }
+  
+  .dark .rbc-overlay-header {
+    border-bottom-color: rgb(75 85 99) !important;
+    color: rgb(243 244 246) !important;
+  }
+  
+  .rbc-event-content {
+    padding: 0.25rem 0 !important;
+  }
+  
+  .rbc-show-more {
+    color: rgb(59 130 246) !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+    background-color: transparent !important;
+  }
+  
+  .rbc-show-more:hover {
+    background-color: rgb(59 130 246) !important;
+    color: white !important;
+  }
+  
+  .dark .rbc-show-more {
+    color: rgb(96 165 250) !important;
+  }
+  
+  .dark .rbc-show-more:hover {
+    background-color: rgb(96 165 250) !important;
+    color: rgb(17 24 39) !important;
   }
   
   .rbc-event.available-slot {
@@ -184,7 +255,8 @@ const TimeSlotManagement: React.FC = () => {
     repeatWeekly: false,
     weekDays: [] as number[],
     skipWeekends: false,
-    skipHolidays: false
+    skipHolidays: false,
+    
   });
 
   const [templates, setTemplates] = useState<any[]>([]);
@@ -1124,6 +1196,7 @@ const TimeSlotManagement: React.FC = () => {
                   onSelectSlot={handleSelectSlot}
                   selectable={true}
                   popup={true}
+                  popupOffset={{ x: 10, y: 10 }}
                   step={30}
                   timeslots={2}
                   min={new Date(2024, 0, 1, 1, 0, 0)}

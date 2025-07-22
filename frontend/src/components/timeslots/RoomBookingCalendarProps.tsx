@@ -2,10 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Calendar as BigCalendar, momentLocalizer, Views } from 'react-big-calendar';
 import moment from 'moment';
@@ -36,6 +34,7 @@ const calendarStyles = `
     border-radius: 12px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     border: 1px solid #e5e7eb;
+    min-height: 750px;
   }
 
   .rbc-event {
@@ -59,6 +58,85 @@ const calendarStyles = `
     background: rgb(17 24 39);
     color: rgb(243 244 246);
     border-color: rgb(55 65 81);
+  }
+
+  .rbc-month-row {
+    min-height: 60px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  
+  .rbc-date-cell {
+    padding: 2px !important;
+    flex: 1 0 0; 
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important; 
+  }
+
+  .rbc-row-content {
+    position: relative;
+    z-index: 2;
+  }
+
+  .rbc-month-view {
+    min-height: 400px !important;
+  }
+
+  .rbc-overlay {
+    background: white !important;
+    border: 1px solid rgb(229 231 235) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15), 0 4px 6px rgba(0,0,0,0.1) !important;
+    padding: 1rem !important;
+    max-width: 300px !important;
+  }
+  
+  .dark .rbc-overlay {
+    background: rgb(31 41 55) !important;
+    border: 1px solid rgb(75 85 99) !important;
+    color: rgb(243 244 246) !important;
+  }
+  
+  .rbc-overlay-header {
+    border-bottom: 1px solid rgb(229 231 235) !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 600 !important;
+  }
+  
+  .dark .rbc-overlay-header {
+    border-bottom-color: rgb(75 85 99) !important;
+    color: rgb(243 244 246) !important;
+  }
+  
+  .rbc-show-more {
+    color: rgb(59 130 246) !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    padding: 3px 6px !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    background-color: transparent !important;
+    text-decoration: none !important;
+    display: block !important;
+    text-align: center !important;
+    margin-top: 4px !important;
+  }
+  
+  .rbc-show-more:hover {
+    background-color: rgb(59 130 246) !important;
+    color: white !important;
+  }
+  
+  .dark .rbc-show-more {
+    color: rgb(96 165 250) !important;
+  }
+  
+  .dark .rbc-show-more:hover {
+    background-color: rgb(96 165 250) !important;
+    color: rgb(17 24 39) !important;
   }
   
   .rbc-event.available-slot {
@@ -182,9 +260,9 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
   const loadTimeSlots = async () => {
     try {
       setLoading(true);
-      
+
       let startDate: Date, endDate: Date;
-      
+
       if (calendarView === Views.DAY) { 
         startDate = new Date(calendarDate);
         endDate = new Date(calendarDate);
@@ -201,7 +279,12 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
         moment(endDate).format('YYYY-MM-DD')
       );
 
-      const roomSlots = slots.filter(slot => slot.room.id === roomId);
+      const now = moment();
+      const roomSlots = slots.filter(slot => {
+        if (slot.room.id !== roomId) return false;
+        const slotDateTime = moment(`${slot.date} ${slot.endTime}`, 'YYYY-MM-DD HH:mm');
+        return slotDateTime.isAfter(now);
+      });
       setTimeSlots(roomSlots);
     } catch (error) {
       toast({
@@ -348,11 +431,7 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
   const CustomEvent = ({ event }: any) => {
     const isMonthView = calendarView === Views.MONTH;
     const isSelected = selectedTimeSlot?.id === event.resource.id;
-    
-    const duration = moment(event.end).diff(moment(event.start), 'minutes');
-    const isShortEvent = duration <= 60; 
-    const isVeryShortEvent = duration <= 30; 
-    
+
     if (isMonthView) {
       return (
         <div className={`text-xs p-1 rounded ${isSelected ? 'ring-2 ring-blue-400' : ''}`}>
@@ -363,11 +442,15 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
             }`}></div>
           </div>
           <div className="text-xs opacity-75 mt-1 truncate">
-            {moment(event.start).format('HH:mm')}
+            {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
           </div>
         </div>
       );
     }
+    
+    const duration = moment(event.end).diff(moment(event.start), 'minutes');
+    const isShortEvent = duration <= 60; 
+    const isVeryShortEvent = duration <= 30; 
     
     if (isVeryShortEvent) {
       return (
@@ -464,13 +547,13 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
           <style>{calendarStyles}</style>
           
           <div className="p-6">
-            <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[600px]">
+            <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
               <BigCalendar
                 localizer={localizer}
                 events={calendarEvents}
                 startAccessor="start"
                 endAccessor="end"
-                style={{ height: 600 }}
+                style={{ height: 700 }}
                 view={calendarView}
                 onView={setCalendarView}
                 date={calendarDate}
@@ -478,6 +561,7 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
                 onSelectEvent={handleSelectEvent}
                 selectable={false}
                 popup={true}
+                popupOffset={{ x: 10, y: 10 }}
                 step={30}
                 timeslots={2}
                 min={new Date(2024, 0, 1, 6, 0, 0)}
