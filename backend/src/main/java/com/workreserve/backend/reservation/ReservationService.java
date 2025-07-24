@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -152,6 +153,20 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
         reservation.setStatus(status);
         return toResponse(reservationRepository.save(reservation));
+    }
+
+    public ReservationResponse getReservationBySlotId(Long slotId) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                
+        Optional<Reservation> reservation = reservationRepository.findByUserIdAndSlotId(user.getId(), slotId);
+        
+        if (reservation.isPresent()) {
+            return toResponse(reservation.get());
+        } else {
+            throw new ResourceNotFoundException("Reservation not found for this slot and user");
+        }
     }
 
     private ReservationResponse toResponse(Reservation reservation) {
