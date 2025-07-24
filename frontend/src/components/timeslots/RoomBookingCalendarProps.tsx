@@ -384,7 +384,7 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">{label}</h3>
           {roomInfo && (
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-              {roomInfo.name} • {roomInfo.capacity} people • {roomInfo.pricePerHour} TND/hour
+              {roomInfo.name} • {roomInfo.capacity} people • {roomInfo.pricePerHour} $/hour
             </p>
           )}
         </div>
@@ -537,7 +537,7 @@ const RoomBookingCalendar: React.FC<RoomBookingCalendarProps> = ({
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  {roomInfo?.pricePerHour} TND/hour
+                  {roomInfo?.pricePerHour} $/hour
                 </div>
               </div>
             </div>

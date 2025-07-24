@@ -216,7 +216,7 @@ const RoomDetailsPage: React.FC = () => {
 
                 <div className="absolute top-4 right-4">
                   <Badge className="bg-green-600 text-white px-4 py-2 shadow-lg">
-                    <span className="font-semibold text-lg">{room!.pricePerHour} TND/h</span>
+                    <span className="font-semibold text-lg">{room!.pricePerHour} $/h</span>
                   </Badge>
                 </div>
 
@@ -281,7 +281,7 @@ const RoomDetailsPage: React.FC = () => {
                   <div className="flex items-center space-x-4 p-6 bg-gray-50 dark:bg-gray-700 rounded-xl">
                     <div>
                       <p className="font-medium dark:text-white text-lg">Price</p>
-                      <p className="text-gray-600 dark:text-gray-300 text-xl font-semibold">{room.pricePerHour} TND/hour</p>
+                      <p className="text-gray-600 dark:text-gray-300 text-xl font-semibold">{room.pricePerHour} $/hour</p>
                     </div>
                   </div>
                 </div>
@@ -351,7 +351,7 @@ const RoomDetailsPage: React.FC = () => {
               <CardContent className="space-y-6">
                 <div className="text-center p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
                   <p className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-1">
-                    {room.pricePerHour} TND
+                    {room.pricePerHour} $
                   </p>
                   <p className="text-gray-600 dark:text-gray-300">per hour</p>
                 </div>

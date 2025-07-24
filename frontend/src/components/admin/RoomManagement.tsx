@@ -560,7 +560,7 @@ const RoomManagement: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        {room.pricePerHour} TND
+                        {room.pricePerHour} $
                       </div>
                     </TableCell>
                     <TableCell>

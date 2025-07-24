@@ -148,7 +148,7 @@ const RoomCard: React.FC<RoomCardProps> = ({
 
         <div className="absolute top-3 right-3">
           <Badge className="bg-green-600 text-white px-3 py-1.5 shadow-md">
-            <span className="font-semibold">{room.pricePerHour} TND/h</span>
+            <span className="font-semibold">{room.pricePerHour} $/h</span>
           </Badge>
         </div>
 

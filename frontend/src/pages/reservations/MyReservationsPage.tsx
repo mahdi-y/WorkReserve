@@ -379,7 +379,7 @@ const MyReservationsPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.totalSpent} TND</p>
+                  <p className="text-2xl font-bold text-purple-600">{stats.totalSpent} $</p>
                 </div>
               </div>
             </CardContent>
@@ -564,7 +564,7 @@ const MyReservationsPage: React.FC = () => {
                                   <div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Total Cost</p>
                                     <p className="font-medium text-gray-900 dark:text-white">
-                                      {reservation.totalCost} TND
+                                      {reservation.totalCost} $
                                     </p>
                                   </div>
                                 </div>
@@ -716,7 +716,7 @@ const MyReservationsPage: React.FC = () => {
                                   <div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Total Cost</p>
                                     <p className="font-medium text-gray-900 dark:text-white">
-                                      {reservation.totalCost} TND
+                                      {reservation.totalCost} $
                                     </p>
                                   </div>
                                 </div>
@@ -795,12 +795,12 @@ const MyReservationsPage: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600 dark:text-gray-400">Total Spent</span>
-                        <span className="font-semibold">{stats.totalSpent} TND</span>
+                        <span className="font-semibold">{stats.totalSpent} $</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600 dark:text-gray-400">Average Cost</span>
                         <span className="font-semibold">
-                          {stats.total > 0 ? Math.round(stats.totalSpent / stats.total) : 0} TND
+                          {stats.total > 0 ? Math.round(stats.totalSpent / stats.total) : 0} $
                         </span>
                       </div>
                     </div>

@@ -1,19 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { loadStripe } from '@stripe/stripe-js';
 import Layout from '../../components/layout/Layout';
 import RoomBookingCalendar from '../../components/timeslots/RoomBookingCalendarProps';
+import PaymentForm from '../../components/payment/PaymentForm';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { useToast } from '../../hooks/use-toast';
-import { reservationService } from '../../services/reservationService';
-import { Calendar, Clock, Users, CheckCircle, ArrowLeft } from 'lucide-react';
+import { paymentService } from '../../services/paymentService';
+import { Calendar, Clock, Users, CheckCircle, ArrowLeft, CreditCard } from 'lucide-react';
 import type { Room } from '../../services/roomService';
 import type { TimeSlot } from '../../services/timeSlotService';
+
+let stripePromise: Promise<any>;
 
 const BookingPage: React.FC = () => {
   const location = useLocation();
@@ -25,7 +29,24 @@ const BookingPage: React.FC = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   const [teamSize, setTeamSize] = useState<number>(1);
   const [loading, setLoading] = useState(false);
-  const [bookingStep, setBookingStep] = useState<'select' | 'confirm' | 'success'>('select');
+  const [bookingStep, setBookingStep] = useState<'select' | 'confirm' | 'payment' | 'success'>('select');
+  const [paymentIntent, setPaymentIntent] = useState<{
+    clientSecret: string;
+    paymentIntentId: string;
+    amount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const initializeStripe = async () => {
+      try {
+        const config = await paymentService.getConfig();
+        stripePromise = loadStripe(config.publishableKey);
+      } catch (error) {
+        console.error('Failed to load Stripe config:', error);
+      }
+    };
+    initializeStripe();
+  }, []);
 
   const calculateTotalCost = () => {
     if (!selectedTimeSlot) return 0;
@@ -42,13 +63,43 @@ const BookingPage: React.FC = () => {
     setBookingStep('confirm');
   };
 
-  const handleBooking = async () => {
+  const handleProceedToPayment = async () => {
     if (!selectedTimeSlot) return;
 
     try {
       setLoading(true);
       
-      await reservationService.create({
+      sessionStorage.setItem('pendingBooking', JSON.stringify({
+        slotId: selectedTimeSlot.id,
+        teamSize: teamSize
+      }));
+      
+      const response = await paymentService.createPaymentIntent({
+        slotId: selectedTimeSlot.id,
+        teamSize: teamSize
+      });
+
+      setPaymentIntent(response);
+      setBookingStep('payment');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to initialize payment",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (!paymentIntent || !selectedTimeSlot) return;
+
+    try {
+      setLoading(true);
+      
+      await paymentService.confirmPayment({
+        paymentIntentId: paymentIntent.paymentIntentId,
         slotId: selectedTimeSlot.id,
         teamSize: teamSize
       });
@@ -57,17 +108,25 @@ const BookingPage: React.FC = () => {
       
       toast({
         title: "Booking Successful!",
-        description: "Your reservation has been created successfully.",
+        description: "Your payment has been processed and reservation created.",
       });
     } catch (error: any) {
       toast({
         title: "Booking Failed",
-        description: error.response?.data?.message || "Failed to create reservation",
+        description: error.response?.data?.message || "Failed to confirm booking",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePaymentError = (error: string) => {
+    toast({
+      title: "Payment Failed",
+      description: error,
+      variant: "destructive"
+    });
   };
 
   const formatTime = (time: string) => {
@@ -118,7 +177,7 @@ const BookingPage: React.FC = () => {
                 <CheckCircle className="w-20 h-20 text-green-600 mx-auto mb-4" />
                 <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Booking Confirmed!</h2>
                 <p className="text-gray-600 dark:text-gray-300 mb-6 text-lg">
-                  Your reservation has been successfully created.
+                  Your payment has been processed and reservation created successfully.
                 </p>
                 <div className="space-y-3 text-sm text-left bg-gray-50 dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
                   <div className="flex justify-between">
@@ -138,8 +197,8 @@ const BookingPage: React.FC = () => {
                     <span className="text-gray-900 dark:text-white">{teamSize} people</span>
                   </div>
                   <div className="flex justify-between border-t pt-3 mt-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300">Total Cost:</span>
-                    <span className="font-bold text-green-600 text-lg">{calculateTotalCost()} TND</span>
+                    <span className="font-bold text-gray-700 dark:text-gray-300">Total Paid:</span>
+                    <span className="font-bold text-green-600 text-lg">{calculateTotalCost().toFixed(3)} $</span>
                   </div>
                 </div>
                 <div className="flex gap-3 mt-8">
@@ -153,6 +212,109 @@ const BookingPage: React.FC = () => {
               </CardContent>
             </Card>
           </motion.div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (bookingStep === 'payment' && paymentIntent && stripePromise) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-4"
+          >
+            <Button
+              variant="ghost"
+              onClick={() => setBookingStep('confirm')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Booking Details
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Complete Payment
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Secure payment for {room.name}
+              </p>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <PaymentForm
+                stripePromise={stripePromise}
+                clientSecret={paymentIntent.clientSecret}
+                amount={paymentIntent.amount}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+                loading={loading}
+              />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Order Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedTimeSlot && (
+                    <>
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h3 className="font-semibold text-lg">{selectedTimeSlot.room.name}</h3>
+                        <Badge className="mt-2">
+                          {selectedTimeSlot.room.type.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Date:</span>
+                          <span className="font-medium">{formatDate(selectedTimeSlot.date)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Time:</span>
+                          <span className="font-medium">
+                            {formatTime(selectedTimeSlot.startTime)} - {formatTime(selectedTimeSlot.endTime)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Team Size:</span>
+                          <span className="font-medium">{teamSize} people</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Rate:</span>
+                          <span className="font-medium">{selectedTimeSlot.room.pricePerHour} $/hour</span>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <div className="flex justify-between items-center text-xl font-bold">
+                          <span>Total:</span>
+                          <span className="text-blue-600">{paymentIntent.amount.toFixed(3)} $</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </div>
       </Layout>
     );
@@ -243,7 +405,7 @@ const BookingPage: React.FC = () => {
                             <Clock className="w-5 h-5 text-gray-500" />
                             <div>
                               <p className="text-gray-500 dark:text-gray-400">Rate</p>
-                              <p className="font-semibold text-gray-900 dark:text-white">{room.pricePerHour} TND/hour</p>
+                              <p className="font-semibold text-gray-900 dark:text-white">{room.pricePerHour} $/hour</p>
                             </div>
                           </div>
                         </div>
@@ -306,13 +468,13 @@ const BookingPage: React.FC = () => {
                         <div className="border-t pt-4">
                           <div className="flex justify-between items-center text-xl font-bold">
                             <span className="text-gray-700 dark:text-gray-300">Total Cost:</span>
-                            <span className="text-green-600 dark:text-green-400">{calculateTotalCost()} TND</span>
+                            <span className="text-green-600 dark:text-green-400">{calculateTotalCost().toFixed(3)} $</span>
                           </div>
                         </div>
 
                         <div className="space-y-3">
                           <Button 
-                            onClick={handleBooking}
+                            onClick={handleProceedToPayment}
                             disabled={loading || teamSize > selectedTimeSlot.room.capacity}
                             className="w-full h-12 text-lg"
                             size="lg"
@@ -320,9 +482,14 @@ const BookingPage: React.FC = () => {
                             {loading ? (
                               <>
                                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                Booking...
+                                Processing...
                               </>
-                            ) : 'Confirm Booking'}
+                            ) : (
+                              <>
+                                <CreditCard className="w-4 h-4 mr-2" />
+                                Proceed to Payment
+                              </>
+                            )}
                           </Button>
                           
                           <Button 

@@ -162,7 +162,7 @@ const MyReservations: React.FC = () => {
                       <span>{reservation.teamSize} people</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span>{reservation.totalCost} TND</span>
+                      <span>{reservation.totalCost} $</span>
                     </div>
                   </div>
                 )}

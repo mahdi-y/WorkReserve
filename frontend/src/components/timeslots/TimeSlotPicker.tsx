@@ -155,7 +155,7 @@ const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({
                     {room.capacity} people
                   </div>
                   <div>
-                    {room.pricePerHour} TND/hour
+                    {room.pricePerHour} $/hour
                   </div>
                 </div>
               </CardHeader>

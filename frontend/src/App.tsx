@@ -17,6 +17,9 @@ import BookingPage from './pages/booking/BookingPage';
 import MyReservationsPage from './pages/reservations/MyReservationsPage';
 import ProfilePage from './pages/profile/ProfilePage'; 
 import GuestRoute from './components/auth/GuestRoute';
+import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
+import PaymentCancelPage from './pages/payment/PaymentCancelPage';
+import BookingSuccessPage from './pages/payment/BookingSuccessPage';
 
 
 function AnimatedRoutes() {
@@ -99,6 +102,31 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route
+          path="/payment/success"
+          element={
+            <ProtectedRoute>
+              <PaymentSuccessPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/cancel"
+          element={
+            <ProtectedRoute>
+              <PaymentCancelPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/booking-success"
+          element={
+            <ProtectedRoute>
+              <BookingSuccessPage />
             </ProtectedRoute>
           }
         />
