@@ -8,14 +8,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,100 +45,92 @@ class ActivityServiceTest {
 
         testActivity = new Activity();
         testActivity.setId(1L);
-        testActivity.setUserId(1L);
         testActivity.setAction("LOGIN");
-        testActivity.setResource("USER");
-        testActivity.setTimestamp(LocalDateTime.now());
-        testActivity.setDetails("User logged in successfully");
+        testActivity.setEntityType("USER");
+        testActivity.setEntityId(1L);
+        testActivity.setEntityName("Test User");
+        testActivity.setCreatedAt(LocalDateTime.now());
     }
 
     @Test
-    void logActivity_Success() {
+    void logActivity_WithEmail_Success() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(activityRepository.save(any(Activity.class))).thenReturn(testActivity);
 
         assertDoesNotThrow(() -> 
-            activityService.logActivity(1L, "LOGIN", "USER", 1L, "User logged in")
+            activityService.logActivity("test@example.com", "LOGIN", "USER", 1L, "Test User")
         );
 
+        verify(userRepository).findByEmail("test@example.com");
         verify(activityRepository).save(any(Activity.class));
     }
 
     @Test
-    void getAllActivities_Success() {
-        List<Activity> activities = Arrays.asList(testActivity);
-        Page<Activity> page = new PageImpl<>(activities);
-        Pageable pageable = PageRequest.of(0, 10);
+    void logActivity_WithUserId_Success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(activityRepository.save(any(Activity.class))).thenReturn(testActivity);
 
-        when(activityRepository.findAllByOrderByTimestampDesc(pageable)).thenReturn(page);
+        assertDoesNotThrow(() -> 
+            activityService.logActivity(1L, "LOGIN", "USER", 1L, "Test User")
+        );
 
-        Page<ActivityResponse> result = activityService.getAllActivities(pageable);
-
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals("LOGIN", result.getContent().get(0).getAction());
-        verify(activityRepository).findAllByOrderByTimestampDesc(pageable);
+        verify(userRepository).findById(1L);
+        verify(activityRepository).save(any(Activity.class));
     }
 
     @Test
-    void getActivitiesByUser_Success() {
-        List<Activity> activities = Arrays.asList(testActivity);
-        Page<Activity> page = new PageImpl<>(activities);
-        Pageable pageable = PageRequest.of(0, 10);
+    void logActivity_UserNotFound_NoError() {
+        when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
 
-        when(activityRepository.findByUserIdOrderByTimestampDesc(1L, pageable)).thenReturn(page);
+        assertDoesNotThrow(() -> 
+            activityService.logActivity("nonexistent@example.com", "LOGIN", "USER", 1L, "Test User")
+        );
 
-        Page<ActivityResponse> result = activityService.getActivitiesByUser(1L, pageable);
-
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals(1L, result.getContent().get(0).getUserId());
-        verify(activityRepository).findByUserIdOrderByTimestampDesc(1L, pageable);
+        verify(userRepository).findByEmail("nonexistent@example.com");
+        verify(activityRepository, never()).save(any(Activity.class));
     }
 
     @Test
-    void getActivitiesByDateRange_Success() {
-        LocalDateTime startDate = LocalDateTime.now().minusDays(7);
-        LocalDateTime endDate = LocalDateTime.now();
+    void getRecentActivityForUser_WithEmail_Success() {
         List<Activity> activities = Arrays.asList(testActivity);
-        Page<Activity> page = new PageImpl<>(activities);
         Pageable pageable = PageRequest.of(0, 10);
 
-        when(activityRepository.findByTimestampBetweenOrderByTimestampDesc(startDate, endDate, pageable))
-            .thenReturn(page);
+        when(activityRepository.findByUserEmailOrderByCreatedAtDesc("test@example.com", pageable))
+            .thenReturn(activities);
 
-        Page<ActivityResponse> result = activityService.getActivitiesByDateRange(startDate, endDate, pageable);
+        List<ActivityResponse> result = activityService.getRecentActivityForUser("test@example.com");
 
         assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        verify(activityRepository).findByTimestampBetweenOrderByTimestampDesc(startDate, endDate, pageable);
+        assertEquals(1, result.size());
+        verify(activityRepository).findByUserEmailOrderByCreatedAtDesc("test@example.com", pageable);
     }
 
     @Test
-    void getActivitiesByAction_Success() {
+    void getRecentActivityForUser_WithUserId_Success() {
         List<Activity> activities = Arrays.asList(testActivity);
-        Page<Activity> page = new PageImpl<>(activities);
         Pageable pageable = PageRequest.of(0, 10);
 
-        when(activityRepository.findByActionOrderByTimestampDesc("LOGIN", pageable)).thenReturn(page);
+        when(activityRepository.findByUserIdOrderByCreatedAtDesc(1L, pageable))
+            .thenReturn(activities);
 
-        Page<ActivityResponse> result = activityService.getActivitiesByAction("LOGIN", pageable);
+        List<ActivityResponse> result = activityService.getRecentActivityForUser(1L);
 
         assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals("LOGIN", result.getContent().get(0).getAction());
-        verify(activityRepository).findByActionOrderByTimestampDesc("LOGIN", pageable);
+        assertEquals(1, result.size());
+        verify(activityRepository).findByUserIdOrderByCreatedAtDesc(1L, pageable);
     }
 
     @Test
     void toActivityResponse_Success() {
-        ActivityResponse response = activityService.toActivityResponse(testActivity);
+        // Use reflection to access private method
+        ActivityResponse response = ReflectionTestUtils.invokeMethod(activityService, "toActivityResponse", testActivity);
 
         assertNotNull(response);
         assertEquals(testActivity.getId(), response.getId());
-        assertEquals(testActivity.getUserId(), response.getUserId());
         assertEquals(testActivity.getAction(), response.getAction());
-        assertEquals(testActivity.getResource(), response.getResource());
-        assertEquals(testActivity.getTimestamp(), response.getTimestamp());
-        assertEquals(testActivity.getDetails(), response.getDetails());
+        assertEquals(testActivity.getEntityType(), response.getEntityType());
+        assertEquals(testActivity.getEntityId(), response.getEntityId());
+        assertEquals(testActivity.getEntityName(), response.getEntityName());
+        assertEquals(testActivity.getCreatedAt(), response.getCreatedAt());
     }
 }
