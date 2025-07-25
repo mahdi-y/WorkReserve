@@ -1,5 +1,6 @@
 package com.workreserve.backend.reservation;
 
+import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.reservation.DTO.ReservationRequest;
 import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.room.Room;
@@ -9,9 +10,12 @@ import com.workreserve.backend.user.User;
 import com.workreserve.backend.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalTime;
 import java.time.LocalDateTime;
@@ -27,6 +31,7 @@ import com.workreserve.backend.exception.ResourceNotFoundException;
 import com.workreserve.backend.exception.ValidationException;
 import com.workreserve.backend.exception.ConflictException;
 
+@ExtendWith(MockitoExtension.class)
 class ReservationServiceTest {
 
     @Mock
@@ -35,6 +40,8 @@ class ReservationServiceTest {
     private TimeSlotRepository timeSlotRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private ActivityService activityService;
 
     @InjectMocks
     private ReservationService reservationService;
@@ -43,6 +50,11 @@ class ReservationServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         SecurityContextHolder.clearContext();
+        // Set the activityService field using reflection since it's @Autowired
+        ReflectionTestUtils.setField(reservationService, "activityService", activityService);
+        ReflectionTestUtils.setField(reservationService, "reservationRepository", reservationRepository);
+        ReflectionTestUtils.setField(reservationService, "timeSlotRepository", timeSlotRepository);
+        ReflectionTestUtils.setField(reservationService, "userRepository", userRepository);
     }
 
     @Test

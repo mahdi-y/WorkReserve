@@ -1,12 +1,16 @@
 package com.workreserve.backend.room;
 
+import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.room.DTO.RoomRequest;
 import com.workreserve.backend.room.DTO.RoomResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 import java.util.List;
@@ -15,10 +19,13 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class RoomServiceTest {
 
     @Mock
     private RoomRepository roomRepository;
+    @Mock
+    private ActivityService activityService;
 
     @InjectMocks
     private RoomService roomService;
@@ -26,6 +33,8 @@ class RoomServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // Set the activityService field using reflection since it's @Autowired
+        ReflectionTestUtils.setField(roomService, "activityService", activityService);
     }
 
     @Test

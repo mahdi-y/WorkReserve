@@ -1,20 +1,25 @@
 package com.workreserve.backend.user;
 
+import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.config.JwtService;
 import com.workreserve.backend.config.MailService;
 import com.workreserve.backend.user.DTO.RegisterRequest;
 import com.workreserve.backend.user.DTO.UserResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
     @Mock
@@ -26,7 +31,9 @@ class UserServiceTest {
     @Mock
     private AuthenticationManager authenticationManager;
     @Mock
-    private MailService emailService; 
+    private MailService emailService;
+    @Mock
+    private ActivityService activityService;
 
     @InjectMocks
     private UserService userService;
@@ -34,6 +41,8 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // Set the activityService field using reflection since it's @Autowired
+        ReflectionTestUtils.setField(userService, "activityService", activityService);
     }
 
     @Test

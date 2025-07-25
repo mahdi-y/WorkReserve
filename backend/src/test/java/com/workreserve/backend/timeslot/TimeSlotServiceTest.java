@@ -266,6 +266,9 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
+        slot.setDate(LocalDate.now()); // Add date to prevent null pointer
+        slot.setStartTime(LocalTime.of(9, 0));
+        slot.setEndTime(LocalTime.of(10, 0));
         
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
@@ -290,6 +293,9 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
+        slot.setDate(LocalDate.now()); // Add date to prevent null pointer
+        slot.setStartTime(LocalTime.of(9, 0));
+        slot.setEndTime(LocalTime.of(10, 0));
         
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
@@ -314,6 +320,9 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
+        slot.setDate(LocalDate.now()); // Add date to prevent null pointer
+        slot.setStartTime(LocalTime.of(9, 0));
+        slot.setEndTime(LocalTime.of(10, 0));
         
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
