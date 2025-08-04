@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './use-toast';
+import { getEnv } from '../lib/env';
 
 declare global {
   interface Window {
@@ -14,19 +15,18 @@ export const useGoogleAuth = () => {
   const { toast } = useToast();
 
   const initializeGoogleAuth = useCallback(() => {
-    console.log('Initializing Google Auth...');
-    console.log('Google object available:', !!window.google);
-    
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    console.log('Client ID from env:', clientId);
-    console.log('All env vars:', import.meta.env);
-    
-    if (!clientId) {
-      console.error('VITE_GOOGLE_CLIENT_ID is not defined!');
-      return;
-    }
-    
-    if (window.google) {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      const clientId = getEnv('VITE_GOOGLE_CLIENT_ID');
+      console.log('Initializing Google Auth...');
+      console.log('Google object available:', !!window.google);
+      console.log('Client ID from env:', clientId);
+      console.log('All env vars:', getEnv('VITE_API_URL'));
+
+      if (!clientId) {
+        console.error('VITE_GOOGLE_CLIENT_ID is not defined!');
+        return;
+      }
+
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleResponse,
@@ -43,19 +43,19 @@ export const useGoogleAuth = () => {
     console.log('Google response received:', response);
     try {
       await loginWithGoogle(response.credential);
-      
+
       toast({
         title: "Welcome!",
         description: "Successfully signed in with Google.",
       });
     } catch (error: any) {
       console.error('Google auth error:', error);
-      
+
       let errorMessage = 'Failed to sign in with Google';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
-      
+
       toast({
         title: "Authentication Failed",
         description: errorMessage,
@@ -67,7 +67,7 @@ export const useGoogleAuth = () => {
   const signInWithGoogle = useCallback(() => {
     console.log('Sign in with Google clicked');
     console.log('Google object available:', !!window.google);
-    
+
     if (window.google && window.google.accounts) {
       console.log('Prompting Google sign in...');
       window.google.accounts.id.prompt();
@@ -81,8 +81,22 @@ export const useGoogleAuth = () => {
     }
   }, [toast]);
 
+  const renderGoogleButton = useCallback((elementId: string) => {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      const element = document.getElementById(elementId);
+      if (element) {
+        window.google.accounts.id.renderButton(element, {
+          theme: 'outline',
+          size: 'large',
+          width: '100%',
+        });
+      }
+    }
+  }, []);
+
   return {
     initializeGoogleAuth,
     signInWithGoogle,
+    renderGoogleButton,
   };
 };
