@@ -44,14 +44,12 @@ public class UserService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    
 
-    @Autowired
     private MailService emailService;
 
-    @Autowired
     private ActivityService activityService;
 
-    @Autowired
     private TwoFactorService twoFactorService;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
@@ -61,13 +59,17 @@ public class UserService implements UserDetailsService {
         PasswordEncoder passwordEncoder,
         JwtService jwtService,
         @Lazy AuthenticationManager authenticationManager,
-        MailService emailService
+        MailService emailService,
+        ActivityService activityService, 
+        TwoFactorService twoFactorService 
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
         this.emailService = emailService;
+        this.activityService = activityService;  
+        this.twoFactorService = twoFactorService; 
     }
 
     @Override

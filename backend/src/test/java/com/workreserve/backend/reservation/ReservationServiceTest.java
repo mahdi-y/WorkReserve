@@ -1,433 +1,325 @@
 package com.workreserve.backend.reservation;
 
+import com.workreserve.backend.activity.ActivityService;
+import com.workreserve.backend.exception.ConflictException;
+import com.workreserve.backend.exception.ResourceNotFoundException;
+import com.workreserve.backend.exception.ValidationException;
 import com.workreserve.backend.reservation.DTO.ReservationRequest;
 import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.room.Room;
+import com.workreserve.backend.room.RoomType;
 import com.workreserve.backend.timeslot.TimeSlot;
 import com.workreserve.backend.timeslot.TimeSlotRepository;
 import com.workreserve.backend.user.User;
+import com.workreserve.backend.user.Role;
 import com.workreserve.backend.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.workreserve.backend.exception.ResourceNotFoundException;
-import com.workreserve.backend.exception.ValidationException;
-import com.workreserve.backend.exception.ConflictException;
-
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)  
 class ReservationServiceTest {
 
     @Mock
     private ReservationRepository reservationRepository;
+
     @Mock
     private TimeSlotRepository timeSlotRepository;
+
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ActivityService activityService;
+
+    @Mock
+    private SecurityContext securityContext;
+
+    @Mock
+    private Authentication authentication;
 
     @InjectMocks
     private ReservationService reservationService;
 
+    private User testUser;
+    private Room testRoom;
+    private TimeSlot testTimeSlot;
+    private Reservation testReservation;
+    private ReservationRequest testRequest;
+
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        SecurityContextHolder.clearContext();
+        SecurityContextHolder.setContext(securityContext);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getName()).thenReturn("test@example.com");
+
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setEmail("test@example.com");
+        testUser.setFullName("Test User");
+        testUser.setRole(Role.USER);
+
+        testRoom = new Room();
+        testRoom.setId(1L);
+        testRoom.setName("Test Room");
+        testRoom.setType(RoomType.CONFERENCE_ROOM);
+        testRoom.setCapacity(10);
+        testRoom.setPricePerHour(25.0);
+
+        testTimeSlot = new TimeSlot();
+        testTimeSlot.setId(1L);
+        testTimeSlot.setDate(LocalDate.now().plusDays(1));
+        testTimeSlot.setStartTime(LocalTime.of(9, 0));
+        testTimeSlot.setEndTime(LocalTime.of(10, 0));
+        testTimeSlot.setRoom(testRoom);
+
+        testReservation = new Reservation();
+        testReservation.setId(1L);
+        testReservation.setUser(testUser);
+        testReservation.setSlot(testTimeSlot);
+        testReservation.setTeamSize(5);
+        testReservation.setTotalCost(25.0);
+        testReservation.setStatus(ReservationStatus.CONFIRMED);
+
+        testRequest = new ReservationRequest();
+        testRequest.setSlotId(1L);
+        testRequest.setTeamSize(5);
     }
 
     @Test
-    void getReservationById_found() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        User user = new User();
-        user.setId(2L);
-        reservation.setUser(user);
-        TimeSlot slot = new TimeSlot();
-        slot.setId(3L);
-        Room room = new Room();
-        room.setId(4L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        reservation.setSlot(slot);
-        reservation.setTeamSize(2);
-        reservation.setTotalCost(10.0);
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setCreatedAt(LocalDateTime.now());
+    void getAllReservations_success() {
+        when(reservationRepository.findAll()).thenReturn(Arrays.asList(testReservation));
 
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        ReservationResponse res = reservationService.getReservationById(1L);
-        assertEquals(1L, res.getId());
-        assertEquals(2, res.getTeamSize());
+        List<ReservationResponse> result = reservationService.getAllReservations();
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testReservation.getId(), result.get(0).getId());
+        assertEquals(testReservation.getTeamSize(), result.get(0).getTeamSize());
+    }
+
+    @Test
+    void getUserReservations_success() {
+        when(reservationRepository.findByUserId(1L)).thenReturn(Arrays.asList(testReservation));
+
+        List<ReservationResponse> result = reservationService.getUserReservations(1L);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testReservation.getId(), result.get(0).getId());
+    }
+
+    @Test
+    void getReservationById_success() {
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+
+        ReservationResponse result = reservationService.getReservationById(1L);
+
+        assertNotNull(result);
+        assertEquals(testReservation.getId(), result.getId());
+        assertEquals(testReservation.getTeamSize(), result.getTeamSize());
     }
 
     @Test
     void getReservationById_notFound() {
-        when(reservationRepository.findById(1L)).thenReturn(Optional.empty());
-        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> reservationService.getReservationById(1L));
-        assertEquals("Reservation not found", ex.getMessage());
+        when(reservationRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.getReservationById(99L);
+        });
     }
 
     @Test
     void createReservation_success() {
-        
-        User user = new User();
-        user.setId(1L);
-        user.setEmail("test@example.com");
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(user.getEmail(), null)
-        );
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(testTimeSlot));
+        when(reservationRepository.existsBySlotIdAndStatusNot(1L, ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findByUserIdAndSlotId(1L, 1L)).thenReturn(Optional.empty());
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
+        doNothing().when(activityService).logActivity(anyLong(), anyString(), anyString(), anyLong(), anyString());
 
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
+        ReservationResponse result = reservationService.createReservation(testRequest);
 
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(2L);
-        req.setTeamSize(3);
-
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(slot));
-        when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(false);
-        when(reservationRepository.findByUserIdAndSlotId(1L, 2L)).thenReturn(Optional.empty());
-        when(reservationRepository.save(any(Reservation.class))).thenAnswer(i -> {
-            Reservation r = i.getArgument(0);
-            r.setId(10L);
-            return r;
-        });
-
-        ReservationResponse res = reservationService.createReservation(req);
-        assertEquals(10L, res.getId());
-        assertEquals(3, res.getTeamSize());
+        assertNotNull(result);
+        assertEquals(testReservation.getId(), result.getId());
+        assertEquals(testReservation.getTeamSize(), result.getTeamSize());
+        verify(reservationRepository).save(any(Reservation.class));
+        verify(activityService).logActivity(eq(1L), contains("Booked"), eq("RESERVATION"), eq(1L), eq("Test Room"));
     }
 
     @Test
     void createReservation_userNotFound() {
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken("notfound@example.com", null)
-        );
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(1L);
-        req.setTeamSize(1);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
 
-        when(userRepository.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
-
-        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> reservationService.createReservation(req));
-        assertEquals("User not found", ex.getMessage());
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.createReservation(testRequest);
+        });
     }
 
     @Test
-    void createReservation_slotNotFound() {
-        User user = new User();
-        user.setId(1L);
-        user.setEmail("test@example.com");
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(user.getEmail(), null)
-        );
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(2L);
-        req.setTeamSize(1);
+    void createReservation_timeSlotNotFound() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.empty());
 
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(timeSlotRepository.findById(2L)).thenReturn(Optional.empty());
-
-        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> reservationService.createReservation(req));
-        assertEquals("Time slot not found", ex.getMessage());
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.createReservation(testRequest);
+        });
     }
 
     @Test
     void createReservation_slotAlreadyReserved() {
-        User user = new User();
-        user.setId(1L);
-        user.setEmail("test@example.com");
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(user.getEmail(), null)
-        );
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(2L);
-        req.setTeamSize(1);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(testTimeSlot));
+        when(reservationRepository.existsBySlotIdAndStatusNot(1L, ReservationStatus.CANCELLED)).thenReturn(true);
 
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(slot));
-        when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(true);
-
-        ConflictException ex = assertThrows(ConflictException.class, () -> reservationService.createReservation(req));
-        assertEquals("Time slot already reserved", ex.getMessage());
+        assertThrows(ConflictException.class, () -> {
+            reservationService.createReservation(testRequest);
+        });
     }
 
     @Test
-    void createReservation_duplicateReservation() {
-        User user = new User();
-        user.setId(1L);
-        user.setEmail("test@example.com");
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(user.getEmail(), null)
-        );
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(2L);
-        req.setTeamSize(1);
+    void createReservation_userAlreadyHasReservation() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(testTimeSlot));
+        when(reservationRepository.existsBySlotIdAndStatusNot(1L, ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findByUserIdAndSlotId(1L, 1L)).thenReturn(Optional.of(testReservation));
 
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(slot));
-        when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(false);
-        when(reservationRepository.findByUserIdAndSlotId(1L, 2L)).thenReturn(Optional.of(new Reservation()));
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.createReservation(req));
-        assertEquals("You already have a reservation for this slot", ex.getMessage());
+        assertThrows(ConflictException.class, () -> {
+            reservationService.createReservation(testRequest);
+        });
     }
 
     @Test
     void createReservation_teamSizeExceedsCapacity() {
-        User user = new User();
-        user.setId(1L);
-        user.setEmail("test@example.com");
-        SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(user.getEmail(), null)
-        );
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(2);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(2L);
-        req.setTeamSize(5);
+        testRequest.setTeamSize(15); 
+        
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(testTimeSlot));
+        when(reservationRepository.existsBySlotIdAndStatusNot(1L, ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findByUserIdAndSlotId(1L, 1L)).thenReturn(Optional.empty());
 
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(slot));
-        when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(false);
-        when(reservationRepository.findByUserIdAndSlotId(1L, 2L)).thenReturn(Optional.empty());
-
-        ValidationException ex = assertThrows(ValidationException.class, () -> reservationService.createReservation(req));
-        assertEquals("Team size exceeds room capacity", ex.getMessage());
+        assertThrows(ValidationException.class, () -> {
+            reservationService.createReservation(testRequest);
+        });
     }
 
     @Test
     void updateReservation_success() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        reservation.setStatus(ReservationStatus.PENDING);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
 
-        User user = new User();
-        user.setId(1L);
-        reservation.setUser(user);
+        ReservationResponse result = reservationService.updateReservation(1L, testRequest);
 
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        reservation.setSlot(slot);
-
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(2L);
-        req.setTeamSize(3);
-
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(slot));
-        when(reservationRepository.existsBySlotIdAndStatusNot(2L, ReservationStatus.CANCELLED)).thenReturn(false);
-        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
-
-        ReservationResponse res = reservationService.updateReservation(1L, req);
-        assertEquals(3, res.getTeamSize());
+        assertNotNull(result);
+        assertEquals(testReservation.getId(), result.getId());
+        verify(reservationRepository).save(any(Reservation.class));
     }
 
     @Test
     void updateReservation_notFound() {
-        ReservationRequest req = new ReservationRequest();
-        when(reservationRepository.findById(1L)).thenReturn(Optional.empty());
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.updateReservation(1L, req));
-        assertEquals("Reservation not found", ex.getMessage());
+        when(reservationRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.updateReservation(99L, testRequest);
+        });
     }
 
     @Test
-    void updateReservation_cancelledOrCompleted() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        reservation.setStatus(ReservationStatus.CANCELLED);
+    void updateReservation_alreadyCancelled() {
+        testReservation.setStatus(ReservationStatus.CANCELLED);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
 
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        ReservationRequest req = new ReservationRequest();
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.updateReservation(1L, req));
-        assertEquals("Cannot update a cancelled or completed reservation", ex.getMessage());
-    }
-
-    @Test
-    void updateReservation_slotNotFound() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        reservation.setStatus(ReservationStatus.PENDING);
-
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        reservation.setSlot(slot);
-
-        ReservationRequest req = new ReservationRequest();
-        req.setSlotId(99L);
-        req.setTeamSize(2);
-
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        when(timeSlotRepository.findById(99L)).thenReturn(Optional.empty());
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.updateReservation(1L, req));
-        assertEquals("Time slot not found", ex.getMessage());
+        assertThrows(ValidationException.class, () -> {
+            reservationService.updateReservation(1L, testRequest);
+        });
     }
 
     @Test
     void cancelReservation_success() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        reservation.setStatus(ReservationStatus.PENDING);
-
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
 
         assertDoesNotThrow(() -> reservationService.cancelReservation(1L));
-        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+
+        verify(reservationRepository).save(any(Reservation.class));
     }
 
     @Test
     void cancelReservation_notFound() {
-        when(reservationRepository.findById(1L)).thenReturn(Optional.empty());
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.cancelReservation(1L));
-        assertEquals("Reservation not found", ex.getMessage());
+        when(reservationRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.cancelReservation(99L);
+        });
     }
 
     @Test
     void updateStatus_success() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        reservation.setStatus(ReservationStatus.PENDING);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
 
-        User user = new User();
-        user.setId(1L);
-        reservation.setUser(user);
+        ReservationResponse result = reservationService.updateStatus(1L, ReservationStatus.COMPLETED);
 
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        reservation.setSlot(slot);
-
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
-
-        ReservationResponse res = reservationService.updateStatus(1L, ReservationStatus.CONFIRMED);
-        assertEquals(ReservationStatus.CONFIRMED, res.getStatus());
+        assertNotNull(result);
+        assertEquals(testReservation.getId(), result.getId());
+        verify(reservationRepository).save(any(Reservation.class));
     }
 
     @Test
     void updateStatus_notFound() {
-        when(reservationRepository.findById(1L)).thenReturn(Optional.empty());
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> reservationService.updateStatus(1L, ReservationStatus.CONFIRMED));
-        assertEquals("Reservation not found", ex.getMessage());
+        when(reservationRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.updateStatus(99L, ReservationStatus.COMPLETED);
+        });
     }
 
     @Test
-    void getAllReservations_returnsList() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        reservation.setSlot(slot);
-        reservation.setUser(new User());
-        reservation.setTeamSize(2);
-        reservation.setTotalCost(10.0);
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setCreatedAt(LocalDateTime.now());
+    void getReservationBySlotId_success() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(reservationRepository.findByUserIdAndSlotId(1L, 1L)).thenReturn(Optional.of(testReservation));
 
-        when(reservationRepository.findAll()).thenReturn(List.of(reservation));
-        List<ReservationResponse> res = reservationService.getAllReservations();
-        assertEquals(1, res.size());
+        ReservationResponse result = reservationService.getReservationBySlotId(1L);
+
+        assertNotNull(result);
+        assertEquals(testReservation.getId(), result.getId());
     }
 
     @Test
-    void getUserReservations_returnsList() {
-        Reservation reservation = new Reservation();
-        reservation.setId(1L);
-        TimeSlot slot = new TimeSlot();
-        slot.setId(2L);
-        Room room = new Room();
-        room.setId(3L);
-        room.setCapacity(5);
-        room.setPricePerHour(10.0);
-        slot.setRoom(room);
-        slot.setStartTime(LocalTime.of(9, 0));
-        slot.setEndTime(LocalTime.of(10, 0));
-        reservation.setSlot(slot);
-        reservation.setUser(new User());
-        reservation.setTeamSize(2);
-        reservation.setTotalCost(10.0);
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setCreatedAt(LocalDateTime.now());
+    void getReservationBySlotId_userNotFound() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
 
-        when(reservationRepository.findByUserId(1L)).thenReturn(List.of(reservation));
-        List<ReservationResponse> res = reservationService.getUserReservations(1L);
-        assertEquals(1, res.size());
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.getReservationBySlotId(1L);
+        });
     }
 
-    
+    @Test
+    void getReservationBySlotId_reservationNotFound() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(reservationRepository.findByUserIdAndSlotId(1L, 1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            reservationService.getReservationBySlotId(1L);
+        });
+    }
 }

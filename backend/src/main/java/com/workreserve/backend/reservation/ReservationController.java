@@ -1,5 +1,6 @@
 package com.workreserve.backend.reservation;
 
+import com.workreserve.backend.exception.ResourceNotFoundException;
 import com.workreserve.backend.reservation.DTO.ReservationRequest;
 import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.user.User;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reservations")
@@ -129,4 +131,19 @@ public class ReservationController {
     public ResponseEntity<ReservationResponse> updateStatus(@PathVariable Long id, @RequestParam ReservationStatus status) {
         return ResponseEntity.ok(reservationService.updateStatus(id, status));
     }
+
+    @GetMapping("/slot/{slotId}")
+@PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+public ResponseEntity<?> getReservationBySlotId(@PathVariable Long slotId) {
+    try {
+        ReservationResponse reservation = reservationService.getReservationBySlotId(slotId);
+        return ResponseEntity.ok(reservation);
+    } catch (ResourceNotFoundException ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", ex.getMessage()));
+    } catch (Exception ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "Reservation not found for this slot and user"));
+    }
+}
 }

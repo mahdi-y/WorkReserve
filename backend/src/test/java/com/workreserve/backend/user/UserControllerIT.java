@@ -1,22 +1,35 @@
 package com.workreserve.backend.user;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workreserve.backend.user.DTO.ChangePasswordRequest;
 import com.workreserve.backend.user.DTO.RegisterRequest;
 import com.workreserve.backend.user.DTO.UpdateRoleRequest;
+import com.workreserve.backend.activity.ActivityRepository;
+import com.workreserve.backend.config.TestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@Import(TestConfig.class)
 class UserControllerIT {
 
     @Autowired
@@ -28,16 +41,48 @@ class UserControllerIT {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ActivityRepository activityRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @BeforeEach
     void cleanDb() {
-        userRepository.deleteAll();
+        try {
+            
+            activityRepository.deleteAll();
+            userRepository.deleteAll();
+            
+            
+            entityManager.flush();
+            entityManager.clear();
+        } catch (Exception e) {
+            
+            System.out.println("Cleanup warning: " + e.getMessage());
+        }
+    }
+
+    @Test
+    void contextLoads() {
+        
+        org.junit.jupiter.api.Assertions.assertNotNull(mockMvc);
+        org.junit.jupiter.api.Assertions.assertNotNull(userRepository);
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getAllUsers_shouldReturnOk() throws Exception {
+        
+        createTestUser("Test User", "test@example.com", "password123");
+
         mockMvc.perform(get("/api/users"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].email").value("test@example.com"));
     }
 
     @Test
@@ -76,7 +121,7 @@ class UserControllerIT {
         RegisterRequest req = new RegisterRequest();
         req.setFullName("New Name");
         req.setEmail("new@example.com");
-        req.setPassword("newpassword");
+        req.setPassword("newpassword123");
 
         mockMvc.perform(put("/api/users/" + user.getId())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -197,5 +242,86 @@ class UserControllerIT {
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Email already in use"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getAllUsers_shouldReturnForbidden_whenNotAdmin() throws Exception {
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isBadRequest()) 
+                .andExpect(jsonPath("$.error").value("Access Denied"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getUserById_shouldReturnForbidden_whenNotAdmin() throws Exception {
+        mockMvc.perform(get("/api/users/1"))
+                .andExpect(status().isBadRequest()) 
+                .andExpect(jsonPath("$.error").value("Access Denied"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void updateUser_shouldReturnForbidden_whenNotAdmin() throws Exception {
+        RegisterRequest req = new RegisterRequest();
+        req.setFullName("Name");
+        req.setEmail("email@example.com");
+        req.setPassword("password123");
+
+        mockMvc.perform(put("/api/users/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest()) 
+                .andExpect(jsonPath("$.error").value("Access Denied"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void deleteUser_shouldReturnForbidden_whenNotAdmin() throws Exception {
+        mockMvc.perform(delete("/api/users/1"))
+                .andExpect(status().isBadRequest()) 
+                .andExpect(jsonPath("$.error").value("Access Denied"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void banUser_shouldReturnForbidden_whenNotAdmin() throws Exception {
+        mockMvc.perform(put("/api/users/1/ban"))
+                .andExpect(status().isBadRequest()) 
+                .andExpect(jsonPath("$.error").value("Access Denied"));
+    }
+
+    @Test
+    void getCurrentUser_shouldReturnUnauthorized_whenNotAuthenticated() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isForbidden()); 
+    }
+
+    @Test
+    void changePassword_shouldReturnUnauthorized_whenNotAuthenticated() throws Exception {
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setOldPassword("old");
+        req.setNewPassword("new12345678");
+
+        mockMvc.perform(put("/api/users/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden()); 
+    }
+
+    
+    private User createTestUser(String fullName, String email, String password) {
+        User user = new User();
+        user.setFullName(fullName);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password)); 
+        user.setRole(Role.USER);
+        user.setEnabled(true);
+        user.setLocked(false);
+        user.setBanned(false);
+        user.setEmailVerified(true); 
+        user.setTwoFactorEnabled(false);
+        user.setFailedLoginAttempts(0);
+        return userRepository.save(user);
     }
 }

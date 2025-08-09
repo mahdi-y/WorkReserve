@@ -10,15 +10,22 @@ import com.workreserve.backend.timeslot.TimeSlotRepository;
 import com.workreserve.backend.user.User;
 import com.workreserve.backend.user.UserRepository;
 import com.workreserve.backend.user.Role;
+import com.workreserve.backend.activity.ActivityRepository;
+import com.workreserve.backend.config.TestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -27,6 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@Import(TestConfig.class)
 class ReservationControllerIT {
 
     @Autowired
@@ -47,35 +57,54 @@ class ReservationControllerIT {
     @Autowired
     private ReservationRepository reservationRepository;
 
+    @Autowired
+    private ActivityRepository activityRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
     private Long userId;
     private Long slotId;
 
     @BeforeEach
     void setup() {
-        reservationRepository.deleteAll();
-        timeSlotRepository.deleteAll();
-        roomRepository.deleteAll();
-        userRepository.deleteAll();
+        try {
+            reservationRepository.deleteAll();
+            timeSlotRepository.deleteAll();
+            roomRepository.deleteAll();
+            activityRepository.deleteAll();
+            userRepository.deleteAll();
+            
+            if (entityManager != null) {
+                entityManager.flush();
+                entityManager.clear();
+            }
+        } catch (Exception e) {
+            System.out.println("Cleanup warning: " + e.getMessage());
+        }
 
-        
         User user = new User();
         user.setFullName("Res User");
         user.setEmail("resuser@example.com");
         user.setPassword("$2a$10$dummyhash");
         user.setRole(Role.USER);
         user.setEnabled(true);
+        user.setLocked(false);
+        user.setBanned(false);
+        user.setEmailVerified(true);
+        user.setTwoFactorEnabled(false);
+        user.setFailedLoginAttempts(0);
         userRepository.save(user);
         userId = user.getId();
 
-        
         Room room = new Room();
         room.setName("Res Room");
         room.setType(RoomType.HOT_DESK);
         room.setPricePerHour(10.0);
         room.setCapacity(5);
+        room.setDescription("Test reservation room");
         roomRepository.save(room);
 
-        
         TimeSlot slot = new TimeSlot();
         slot.setDate(LocalDate.now().plusDays(1));
         slot.setStartTime(LocalTime.of(9, 0));
@@ -96,7 +125,9 @@ class ReservationControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.teamSize").value(2));
+                .andExpect(jsonPath("$.teamSize").value(2))
+                .andExpect(jsonPath("$.totalCost").exists())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
     }
 
     @Test
@@ -131,7 +162,8 @@ class ReservationControllerIT {
     @WithMockUser(username = "resuser@example.com", roles = "USER")
     void getUserReservations_shouldReturnOk() throws Exception {
         mockMvc.perform(get("/api/reservations/user"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 
     @Test
@@ -145,7 +177,6 @@ class ReservationControllerIT {
     @Test
     @WithMockUser(username = "resuser@example.com", roles = "USER")
     void updateReservation_shouldReturnOk() throws Exception {
-        
         Reservation reservation = new Reservation();
         reservation.setUser(userRepository.findById(userId).orElseThrow());
         reservation.setSlot(timeSlotRepository.findById(slotId).orElseThrow());
@@ -182,7 +213,6 @@ class ReservationControllerIT {
     @Test
     @WithMockUser(username = "resuser@example.com", roles = "USER")
     void cancelReservation_shouldReturnNoContent() throws Exception {
-        
         Reservation reservation = new Reservation();
         reservation.setUser(userRepository.findById(userId).orElseThrow());
         reservation.setSlot(timeSlotRepository.findById(slotId).orElseThrow());
@@ -207,13 +237,13 @@ class ReservationControllerIT {
     @WithMockUser(roles = "ADMIN")
     void getAllReservations_shouldReturnOk() throws Exception {
         mockMvc.perform(get("/api/reservations"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void updateStatus_shouldReturnOk() throws Exception {
-        
         Reservation reservation = new Reservation();
         reservation.setUser(userRepository.findById(userId).orElseThrow());
         reservation.setSlot(timeSlotRepository.findById(slotId).orElseThrow());
@@ -236,5 +266,51 @@ class ReservationControllerIT {
                 .param("status", "CONFIRMED"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Reservation not found"));
+    }
+
+    @Test
+    @WithMockUser(username = "resuser@example.com", roles = "USER")
+    void createReservation_shouldReturnBadRequest_whenSlotAlreadyReserved() throws Exception {
+        Reservation existingReservation = new Reservation();
+        existingReservation.setUser(userRepository.findById(userId).orElseThrow());
+        existingReservation.setSlot(timeSlotRepository.findById(slotId).orElseThrow());
+        existingReservation.setTeamSize(2);
+        existingReservation.setTotalCost(10.0);
+        existingReservation.setStatus(ReservationStatus.CONFIRMED);
+        reservationRepository.save(existingReservation);
+
+        ReservationRequest req = new ReservationRequest();
+        req.setSlotId(slotId);
+        req.setTeamSize(2);
+
+        mockMvc.perform(post("/api/reservations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest()) 
+                .andExpect(jsonPath("$.error").value("Time slot already reserved"));
+    }
+
+    @Test
+    @WithMockUser(username = "resuser@example.com", roles = "USER")
+    void getReservationBySlotId_shouldReturnOk() throws Exception {
+        Reservation reservation = new Reservation();
+        reservation.setUser(userRepository.findById(userId).orElseThrow());
+        reservation.setSlot(timeSlotRepository.findById(slotId).orElseThrow());
+        reservation.setTeamSize(2);
+        reservation.setTotalCost(10.0);
+        reservation.setStatus(ReservationStatus.CONFIRMED);
+        reservationRepository.save(reservation);
+
+        mockMvc.perform(get("/api/reservations/slot/" + slotId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(reservation.getId()));
+    }
+
+    @Test
+    @WithMockUser(username = "resuser@example.com", roles = "USER")
+    void getReservationBySlotId_shouldReturnBadRequest_whenNotFound() throws Exception {
+        mockMvc.perform(get("/api/reservations/slot/99999"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Reservation not found for this slot and user"));
     }
 }

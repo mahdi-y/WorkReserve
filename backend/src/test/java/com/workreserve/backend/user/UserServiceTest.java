@@ -15,6 +15,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.workreserve.backend.activity.ActivityService;
+import com.workreserve.backend.auth.TwoFactorService;
+
 class UserServiceTest {
 
     @Mock
@@ -27,6 +30,10 @@ class UserServiceTest {
     private AuthenticationManager authenticationManager;
     @Mock
     private MailService emailService; 
+    @Mock
+    private ActivityService activityService;  
+    @Mock
+    private TwoFactorService twoFactorService; 
 
     @InjectMocks
     private UserService userService;
@@ -68,9 +75,28 @@ class UserServiceTest {
             return u;
         });
         when(jwtService.generateToken("test@example.com")).thenReturn("token");
+        
+        
+        doNothing().when(activityService).logActivity(
+            anyLong(), anyString(), anyString(), anyLong(), anyString()
+        );
+        
+        
+        doNothing().when(emailService).sendVerificationEmail(
+            anyString(), anyString(), anyString()
+        );
 
         var res = userService.registerUser(req);
         assertEquals("token", res.getToken());
+        
+        
+        verify(activityService, times(1)).logActivity(
+            eq(1L), 
+            eq("New user registered: test@example.com"), 
+            eq("USER"), 
+            eq(1L), 
+            eq("Test User")
+        );
     }
 
     @Test

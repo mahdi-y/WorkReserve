@@ -1,0 +1,51 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+  
+  h2:
+    console:
+      enabled: true
+  
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+# JWT Configuration
+jwt:
+  secret: test-secret-key-for-integration-tests-that-is-long-enough-for-jwt-security-requirements-minimum-32-characters
+  expiration: 86400000
+
+# Google OAuth Configuration  
+google:
+  client:
+    id: test-google-client-id
+
+# Disable rate limiting
+app:
+  rate-limit:
+    enabled: false
+
+# Logging
+logging:
+  level:
+    com.workreserve: INFO
+    root: WARN
