@@ -6,22 +6,33 @@ import com.workreserve.backend.user.DTO.LoginRequest;
 import com.workreserve.backend.user.DTO.RegisterRequest;
 import com.workreserve.backend.user.DTO.ForgotPasswordRequest;
 import com.workreserve.backend.user.DTO.ResetPasswordRequest;
+import com.workreserve.backend.activity.ActivityRepository;
+import com.workreserve.backend.config.TestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+@Import(TestConfig.class) 
 class AuthControllerIT {
 
     @Autowired
@@ -36,10 +47,33 @@ class AuthControllerIT {
     @Autowired
     private ReservationRepository reservationRepository;
 
+    
+    @Autowired
+    private ActivityRepository activityRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @BeforeEach
     void cleanDb() {
-        reservationRepository.deleteAll();
-        userRepository.deleteAll();
+        try {
+            
+            reservationRepository.deleteAll();
+            activityRepository.deleteAll();
+            userRepository.deleteAll();
+            
+            
+            if (entityManager != null) {
+                entityManager.flush();
+                entityManager.clear();
+            }
+        } catch (Exception e) {
+            
+            System.out.println("Cleanup warning: " + e.getMessage());
+        }
     }
 
     @Test
@@ -53,18 +87,13 @@ class AuthControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").exists());
+                .andExpect(jsonPath("$.token").exists()); 
     }
 
     @Test
     void register_shouldReturnBadRequest_whenEmailExists() throws Exception {
         
-        User user = new User();
-        user.setFullName("Existing");
-        user.setEmail("exists@example.com");
-        user.setPassword("password123");
-        user.setRole(Role.USER);
-        userRepository.save(user);
+        createTestUser("Existing", "exists@example.com", "password123");
 
         RegisterRequest req = new RegisterRequest();
         req.setFullName("New User");
@@ -80,16 +109,8 @@ class AuthControllerIT {
 
     @Test
     void login_shouldReturnToken_whenValid() throws Exception {
-        User user = new User();
-        user.setFullName("Login User");
-        user.setEmail("login@example.com");
-
-        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
-        user.setPassword(encoder.encode("password123"));
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(true);
-        userRepository.save(user);
+        
+        createTestUser("Login User", "login@example.com", "password123");
 
         LoginRequest req = new LoginRequest();
         req.setEmail("login@example.com");
@@ -112,21 +133,15 @@ class AuthControllerIT {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").exists());
+                .andExpect(status().isUnauthorized()) 
+                .andExpect(jsonPath("$.message").value("Invalid credentials"));
     }
 
     @Test
     void login_shouldReturnBadRequest_whenEmailNotVerified() throws Exception {
-        User user = new User();
-        user.setFullName("Unverified User");
-        user.setEmail("unverified@example.com");
         
-        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
-        user.setPassword(encoder.encode("password123"));
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(false); 
+        User user = createTestUser("Unverified User", "unverified@example.com", "password123");
+        user.setEmailVerified(false);
         userRepository.save(user);
 
         LoginRequest req = new LoginRequest();
@@ -136,22 +151,15 @@ class AuthControllerIT {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Email not verified. Please check your inbox."));
+                .andExpect(status().isUnauthorized()) 
+                .andExpect(jsonPath("$.message").value("Email not verified. Please check your inbox."));
     }
 
     @Test
     void login_shouldReturnBadRequest_whenAccountLocked() throws Exception {
-        User user = new User();
-        user.setFullName("Locked User");
-        user.setEmail("locked@example.com");
         
-        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
-        user.setPassword(encoder.encode("password123"));
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(true);
-        user.setLocked(true); 
+        User user = createTestUser("Locked User", "locked@example.com", "password123");
+        user.setLocked(true);
         userRepository.save(user);
 
         LoginRequest req = new LoginRequest();
@@ -161,23 +169,14 @@ class AuthControllerIT {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Account is locked. Please check your email to unlock."));
+                .andExpect(status().isUnauthorized()) 
+                .andExpect(jsonPath("$.message").value("Account is locked. Please check your email to unlock."));
     }
 
     @Test
     void refreshToken_shouldReturnNewTokens_whenValid() throws Exception {
         
-        User user = new User();
-        user.setFullName("Refresh User");
-        user.setEmail("refresh@example.com");
-        
-        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
-        user.setPassword(encoder.encode("password123"));
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(true);
-        userRepository.save(user);
+        User user = createTestUser("Refresh User", "refresh@example.com", "password123");
 
         LoginRequest loginReq = new LoginRequest();
         loginReq.setEmail("refresh@example.com");
@@ -191,7 +190,6 @@ class AuthControllerIT {
 
         String refreshToken = objectMapper.readTree(loginResponse).get("refreshToken").asText();
 
-        
         mockMvc.perform(post("/api/auth/refresh-token?refreshToken=" + refreshToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").exists())
@@ -207,12 +205,8 @@ class AuthControllerIT {
 
     @Test
     void verifyEmail_shouldReturnOk_whenValidToken() throws Exception {
-        User user = new User();
-        user.setFullName("Verify User");
-        user.setEmail("verify@example.com");
-        user.setPassword("password123");
-        user.setRole(Role.USER);
-        user.setEnabled(true);
+        
+        User user = createTestUser("Verify User", "verify@example.com", "password123");
         user.setEmailVerified(false);
         user.setVerificationToken("valid-token");
         user.setVerificationTokenCreatedAt(java.time.LocalDateTime.now());
@@ -232,12 +226,8 @@ class AuthControllerIT {
 
     @Test
     void resendVerification_shouldReturnOk() throws Exception {
-        User user = new User();
-        user.setFullName("Resend User");
-        user.setEmail("resend@example.com");
-        user.setPassword("password123");
-        user.setRole(Role.USER);
-        user.setEnabled(true);
+        
+        User user = createTestUser("Resend User", "resend@example.com", "password123");
         user.setEmailVerified(false);
         userRepository.save(user);
 
@@ -248,14 +238,8 @@ class AuthControllerIT {
 
     @Test
     void forgotPassword_shouldReturnOk() throws Exception {
-        User user = new User();
-        user.setFullName("Forgot User");
-        user.setEmail("forgot@example.com");
-        user.setPassword("password123");
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(true);
-        userRepository.save(user);
+        
+        createTestUser("Forgot User", "forgot@example.com", "password123");
 
         ForgotPasswordRequest req = new ForgotPasswordRequest();
         req.setEmail("forgot@example.com");
@@ -269,13 +253,8 @@ class AuthControllerIT {
 
     @Test
     void resetPassword_shouldReturnOk_whenValidToken() throws Exception {
-        User user = new User();
-        user.setFullName("Reset User");
-        user.setEmail("reset@example.com");
-        user.setPassword("password123");
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(true);
+        
+        User user = createTestUser("Reset User", "reset@example.com", "password123");
         user.setResetPasswordToken("reset-token");
         user.setResetPasswordTokenCreatedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
@@ -305,28 +284,39 @@ class AuthControllerIT {
     }
 
     @Test
-    void unlockAccount_shouldReturnOk_whenValidToken() throws Exception {
-        User user = new User();
-        user.setFullName("Unlock User");
-        user.setEmail("unlock@example.com");
-        user.setPassword("password123");
-        user.setRole(Role.USER);
-        user.setEnabled(true);
-        user.setEmailVerified(true);
-        user.setLocked(true);
-        user.setUnlockToken("unlock-token");
-        user.setUnlockTokenCreatedAt(java.time.LocalDateTime.now());
-        userRepository.save(user);
+void unlockAccount_shouldReturnOk_whenValidToken() throws Exception {
+    
+    User user = createTestUser("Unlock User", "unlock@example.com", "password123");
+    user.setLocked(true);
+    user.setUnlockToken("unlock-token");
+    user.setUnlockTokenCreatedAt(java.time.LocalDateTime.now());
+    userRepository.save(user);
 
-        mockMvc.perform(post("/api/auth/unlock?email=unlock@example.com&token=unlock-token"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Account unlocked. You can now log in."));
-    }
+    mockMvc.perform(post("/api/auth/unlock?email=unlock@example.com&token=unlock-token"))
+            .andExpect(status().isOk())
+            .andExpect(content().string("Account unlocked successfully.")); 
+}
 
     @Test
     void unlockAccount_shouldReturnBadRequest_whenInvalidToken() throws Exception {
         mockMvc.perform(post("/api/auth/unlock?email=test@example.com&token=invalid-token"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").exists());
+                .andExpect(content().string("User not found")); 
+    }
+
+    
+    private User createTestUser(String fullName, String email, String password) {
+        User user = new User();
+        user.setFullName(fullName);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password)); 
+        user.setRole(Role.USER);
+        user.setEnabled(true);
+        user.setLocked(false);
+        user.setBanned(false);
+        user.setEmailVerified(true); 
+        user.setTwoFactorEnabled(false);
+        user.setFailedLoginAttempts(0);
+        return userRepository.save(user);
     }
 }

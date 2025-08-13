@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -11,10 +12,12 @@ import { timeSlotService, type TimeSlot } from '../../services/timeSlotService';
 import { useToast } from '../../hooks/use-toast';
 
 interface TimeSlotPickerProps {
-  roomId?: number;
-  selectedDate?: string;
-  onTimeSlotSelect?: (timeSlot: TimeSlot) => void;
-  selectedTimeSlot?: TimeSlot | null;
+  roomId: number;
+  selectedDate: string;
+  onTimeSlotSelect: (slot: any) => void;
+  selectedTimeSlot: any;
+  loading?: boolean; //
+  error?: string;  
 }
 
 const TimeSlotPicker: React.FC<TimeSlotPickerProps> = ({

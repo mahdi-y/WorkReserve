@@ -54,7 +54,7 @@ public class ReservationService {
         return toResponse(reservation);
     }
 
-    @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots"}, allEntries = true)
+    @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots", "reservations", "user-reservations"}, allEntries = true)
     public ReservationResponse createReservation(ReservationRequest request) {
         
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -104,7 +104,7 @@ public class ReservationService {
         return toResponse(savedReservation);
     }
 
-    @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots"}, allEntries = true)
+    @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots", "reservations", "user-reservations"}, allEntries = true)
     public ReservationResponse updateReservation(Long id, ReservationRequest request) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
@@ -139,7 +139,7 @@ public class ReservationService {
         return toResponse(updated);
     }
 
-    @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots"}, allEntries = true)
+    @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots", "reservations", "user-reservations"}, allEntries = true)
     public void cancelReservation(Long id) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));

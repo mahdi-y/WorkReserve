@@ -22,6 +22,7 @@ export interface User {
 
 export interface AuthResponse {
   message: string;
+  
 }
 
 export interface AuthResponseToken {

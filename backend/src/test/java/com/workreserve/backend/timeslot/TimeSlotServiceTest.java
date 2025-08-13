@@ -5,6 +5,7 @@ import com.workreserve.backend.room.RoomRepository;
 import com.workreserve.backend.room.RoomService;
 import com.workreserve.backend.timeslot.DTO.TimeSlotRequest;
 import com.workreserve.backend.timeslot.DTO.TimeSlotResponse;
+import com.workreserve.backend.timeslot.DTO.TimeSlotGenerationRequest;
 import com.workreserve.backend.reservation.ReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import java.time.LocalTime;
 import java.util.Optional;
 import java.util.Collections;
 import java.util.List;
+import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -48,7 +50,7 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
-        slot.setDate(LocalDate.now());
+        slot.setDate(LocalDate.now().plusDays(1)); 
         slot.setStartTime(LocalTime.of(9, 0));
         slot.setEndTime(LocalTime.of(10, 0));
         
@@ -78,7 +80,7 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
-        slot.setDate(LocalDate.now());
+        slot.setDate(LocalDate.now().plusDays(1)); 
         slot.setStartTime(LocalTime.of(9, 0));
         slot.setEndTime(LocalTime.of(10, 0));
         
@@ -87,7 +89,7 @@ class TimeSlotServiceTest {
         
         when(timeSlotRepository.findAll()).thenReturn(List.of(slot));
         when(roomService.getRoomById(1L)).thenReturn(roomResponse);
-        when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
         
         List<TimeSlotResponse> result = timeSlotService.getAllTimeSlots();
         assertEquals(1, result.size());
@@ -120,7 +122,7 @@ class TimeSlotServiceTest {
                 .thenReturn(Collections.emptyList());
         when(timeSlotRepository.save(any(TimeSlot.class))).thenReturn(saved);
         when(roomService.getRoomById(1L)).thenReturn(roomResponse);
-        when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
 
         TimeSlotResponse result = timeSlotService.createTimeSlot(request);
         assertEquals(1L, result.getId());
@@ -146,7 +148,7 @@ class TimeSlotServiceTest {
         request.setEndTime(LocalTime.of(9, 0)); 
         request.setRoomId(1L);
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.createTimeSlot(request));
+        ValidationException ex = assertThrows(ValidationException.class, () -> timeSlotService.createTimeSlot(request)); 
         assertEquals("Start time must be before end time", ex.getMessage());
     }
 
@@ -200,6 +202,7 @@ class TimeSlotServiceTest {
         TimeSlot existing = new TimeSlot();
         existing.setId(1L);
         existing.setRoom(room);
+        existing.setDate(LocalDate.now().plusDays(1)); 
 
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
@@ -210,7 +213,7 @@ class TimeSlotServiceTest {
                 .thenReturn(Collections.emptyList());
         when(timeSlotRepository.save(existing)).thenReturn(existing);
         when(roomService.getRoomById(1L)).thenReturn(roomResponse);
-        when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
 
         TimeSlotResponse result = timeSlotService.updateTimeSlot(1L, request);
         assertEquals(1L, result.getId());
@@ -221,7 +224,7 @@ class TimeSlotServiceTest {
         TimeSlotRequest request = new TimeSlotRequest();
         when(timeSlotRepository.findById(1L)).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.updateTimeSlot(1L, request));
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> timeSlotService.updateTimeSlot(1L, request)); 
         assertEquals("Time slot not found", ex.getMessage());
     }
 
@@ -254,7 +257,7 @@ class TimeSlotServiceTest {
         when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(timeSlot));
         when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(true);
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> timeSlotService.deleteTimeSlot(1L));
+        ValidationException ex = assertThrows(ValidationException.class, () -> timeSlotService.deleteTimeSlot(1L)); 
         assertEquals("Cannot delete time slot with active reservations", ex.getMessage());
     }
 
@@ -266,13 +269,16 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
+        slot.setDate(LocalDate.now().plusDays(1)); 
+        slot.setStartTime(LocalTime.of(9, 0)); 
+        slot.setEndTime(LocalTime.of(10, 0)); 
         
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
 
         when(timeSlotRepository.findByRoomId(1L)).thenReturn(List.of(slot));
         when(roomService.getRoomById(1L)).thenReturn(roomResponse);
-        when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
 
         List<TimeSlotResponse> result = timeSlotService.getTimeSlotsByRoom(1L);
         assertEquals(1, result.size());
@@ -290,13 +296,16 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
+        slot.setDate(LocalDate.now().plusDays(1)); 
+        slot.setStartTime(LocalTime.of(9, 0)); 
+        slot.setEndTime(LocalTime.of(10, 0)); 
         
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
 
         when(timeSlotRepository.findAvailableTimeSlots(startDate, endDate)).thenReturn(List.of(slot));
         when(roomService.getRoomById(1L)).thenReturn(roomResponse);
-        when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
 
         List<TimeSlotResponse> result = timeSlotService.getAvailableTimeSlots(startDate, endDate);
         assertEquals(1, result.size());
@@ -314,16 +323,57 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(1L);
         slot.setRoom(room);
+        slot.setDate(LocalDate.now().plusDays(1)); 
+        slot.setStartTime(LocalTime.of(9, 0)); 
+        slot.setEndTime(LocalTime.of(10, 0)); 
         
         com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
         roomResponse.setId(1L);
 
         when(timeSlotRepository.findByDateBetween(startDate, endDate)).thenReturn(List.of(slot));
         when(roomService.getRoomById(1L)).thenReturn(roomResponse);
-        when(reservationRepository.existsBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(false);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
 
         List<TimeSlotResponse> result = timeSlotService.getTimeSlotsByDateRange(startDate, endDate);
         assertEquals(1, result.size());
         assertEquals(1L, result.get(0).getId());
+    }
+
+    @Test
+    void generateBulkTimeSlots_success() {
+        TimeSlotGenerationRequest request = new TimeSlotGenerationRequest();
+        request.setStartDate(LocalDate.now().plusDays(1));
+        request.setEndDate(LocalDate.now().plusDays(3));
+        request.setRoomId(1L);
+        
+        TimeSlotGenerationRequest.TimeSlotTemplate template = new TimeSlotGenerationRequest.TimeSlotTemplate();
+        template.setStartTime("09:00");
+        template.setEndTime("10:00");
+        request.setTimeSlots(Arrays.asList(template));
+
+        Room room = new Room();
+        room.setId(1L);
+
+        TimeSlot savedSlot = new TimeSlot();
+        savedSlot.setId(1L);
+        savedSlot.setDate(LocalDate.now().plusDays(1));
+        savedSlot.setStartTime(LocalTime.of(9, 0));
+        savedSlot.setEndTime(LocalTime.of(10, 0));
+        savedSlot.setRoom(room);
+
+        com.workreserve.backend.room.DTO.RoomResponse roomResponse = new com.workreserve.backend.room.DTO.RoomResponse();
+        roomResponse.setId(1L);
+
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(timeSlotRepository.findConflictingTimeSlots(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(timeSlotRepository.save(any(TimeSlot.class))).thenReturn(savedSlot);
+        when(roomService.getRoomById(1L)).thenReturn(roomResponse);
+        when(reservationRepository.findBySlotIdAndStatusNot(1L, com.workreserve.backend.reservation.ReservationStatus.CANCELLED)).thenReturn(Collections.emptyList());
+
+        List<TimeSlotResponse> result = timeSlotService.generateBulkTimeSlots(request);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        verify(timeSlotRepository, atLeastOnce()).save(any(TimeSlot.class));
     }
 }
