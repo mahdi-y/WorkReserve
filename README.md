@@ -51,25 +51,25 @@ Planned: Webhooks (Stripe), Payment provider abstraction, Redis (if horizontal s
 ---
 
 ## 🧭 Table of Contents
-1. Overview & Value Proposition  
-2. High-Level Architecture  
-3. Domain Model  
-4. Core Flows (Booking, Payment, TimeSlot Lifecycle, 2FA)  
-5. Tech Stack & Key Libraries  
-6. Repository Structure  
-7. Environment Configuration  
-8. Backend Setup & Run  
-9. Frontend Setup & Run  
-10. Payment (Stripe) Integration Details  
-11. TimeSlot Management & Cleanup Strategy  
-12. Reliability & Retry Logic  
-13. Caching Layer (Caffeine)  
-14. Security Model (Auth, Roles, 2FA)  
-15. Testing Strategy (incl. backend API testing)  
-16. Logging & Monitoring  
-17. Roadmap / Pending Items  
-18. Contributing  
-19. License  
+1. [Overview & Value Proposition](#1-overview--value-proposition)  
+2. [High-Level Architecture](#2-high-level-architecture)  
+3. [Domain Model](#3-domain-model)  
+4. [Core Flows (Booking, Payment, TimeSlot Lifecycle, 2FA)](#4-core-flows)  
+5. [Tech Stack & Key Libraries](#5-tech-stack--key-libraries)  
+6. [Repository Structure](#6-repository-structure)  
+7. [Environment Configuration](#7-environment-configuration)  
+8. [Backend Setup & Run](#8-backend-setup--run)  
+9. [Frontend Setup & Run](#9-frontend-setup--run)  
+10. [Payment (Stripe) Integration Details](#10-payment-stripe-integration-details)  
+11. [TimeSlot Management & Cleanup Strategy](#11-timeslot-management--cleanup-strategy)  
+12. [Reliability & Retry Logic](#12-reliability--retry-logic)  
+13. [Caching Layer (Caffeine)](#13-caching-layer-caffeine)  
+14. [Security Model (Auth, Roles, 2FA)](#14-security-model)  
+15. [Testing Strategy (incl. backend API testing)](#15-testing-strategy-backend-api)  
+16. [Logging & Monitoring](#16-logging--monitoring)  
+17. [Roadmap / Pending Items](#17-roadmap--pending-items)  
+18. [Contributing](#18-contributing)  
+19. [License](#19-license)  
 
 ---
 
