@@ -1,5 +1,7 @@
 package com.workreserve.backend.reservation;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -59,4 +61,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findAllByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime date);
 
     boolean existsBySlotId(Long slotId);
+
+    @Query("SELECT r FROM Reservation r " +
+           "JOIN FETCH r.slot s " +                
+           "JOIN FETCH s.room " +                   
+           "WHERE r.user.id = :userId " +
+           "  AND r.status <> com.workreserve.backend.reservation.ReservationStatus.CANCELLED " +
+           "  AND (s.date > :today OR (s.date = :today AND s.startTime >= :now)) " +
+           "ORDER BY s.date ASC, s.startTime ASC")
+    List<Reservation> findNearestByUserId(@Param("userId") Long userId,
+                                         @Param("today") java.time.LocalDate today,
+                                         @Param("now") java.time.LocalTime now,
+                                         Pageable pageable);
 }

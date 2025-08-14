@@ -1,6 +1,7 @@
 package com.workreserve.backend.reservation;
 
 import com.workreserve.backend.exception.ResourceNotFoundException;
+import com.workreserve.backend.reservation.DTO.NearestReservationResponse;
 import com.workreserve.backend.reservation.DTO.ReservationRequest;
 import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.user.User;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/reservations")
@@ -133,17 +136,35 @@ public class ReservationController {
     }
 
     @GetMapping("/slot/{slotId}")
-@PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-public ResponseEntity<?> getReservationBySlotId(@PathVariable Long slotId) {
-    try {
-        ReservationResponse reservation = reservationService.getReservationBySlotId(slotId);
-        return ResponseEntity.ok(reservation);
-    } catch (ResourceNotFoundException ex) {
-        return ResponseEntity.badRequest()
-                .body(Map.of("error", ex.getMessage()));
-    } catch (Exception ex) {
-        return ResponseEntity.badRequest()
-                .body(Map.of("error", "Reservation not found for this slot and user"));
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<?> getReservationBySlotId(@PathVariable Long slotId) {
+        try {
+            ReservationResponse reservation = reservationService.getReservationBySlotId(slotId);
+            return ResponseEntity.ok(reservation);
+        } catch (ResourceNotFoundException ex) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Reservation not found for this slot and user"));
+        }
     }
-}
+
+    @Operation(summary = "Get nearest reservation", description = "Get the next upcoming reservation for the authenticated user")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Nearest reservation returned"),
+        @ApiResponse(responseCode = "204", description = "No upcoming reservations"),
+        @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    @GetMapping("/nearest")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<?> getNearestReservation() {
+        try {
+            Optional<NearestReservationResponse> res = reservationService.getNearestReservationForCurrentUser();
+            return res.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", ex.getMessage()));
+        }
+    }
 }

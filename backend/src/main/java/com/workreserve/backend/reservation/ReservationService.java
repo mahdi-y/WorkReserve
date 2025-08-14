@@ -4,6 +4,7 @@ import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.exception.ConflictException;
 import com.workreserve.backend.exception.ResourceNotFoundException;
 import com.workreserve.backend.exception.ValidationException;
+import com.workreserve.backend.reservation.DTO.NearestReservationResponse;
 import com.workreserve.backend.reservation.DTO.ReservationRequest;
 import com.workreserve.backend.reservation.DTO.ReservationResponse;
 import com.workreserve.backend.timeslot.TimeSlot;
@@ -13,9 +14,13 @@ import com.workreserve.backend.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -71,38 +76,59 @@ public class ReservationService {
         }
 
         
-        if (reservationRepository.findByUserIdAndSlotId(user.getId(), timeSlot.getId()).isPresent()) {
-            throw new ConflictException("You already have a reservation for this slot");
+        Optional<Reservation> existingOpt = reservationRepository.findByUserIdAndSlotId(user.getId(), timeSlot.getId());
+        if (existingOpt.isPresent()) {
+            Reservation existing = existingOpt.get();
+            if (existing.getStatus() != ReservationStatus.CANCELLED) {
+                throw new ConflictException("You already have a reservation for this slot");
+            }
+            if (request.getTeamSize() > timeSlot.getRoom().getCapacity()) {
+                throw new ValidationException("Team size exceeds room capacity");
+            }
+            double totalCost = timeSlot.getRoom().getPricePerHour() *
+                    (timeSlot.getEndTime().toSecondOfDay() - timeSlot.getStartTime().toSecondOfDay()) / 3600.0;
+            existing.setTeamSize(request.getTeamSize());
+            existing.setTotalCost(totalCost);
+            existing.setStatus(ReservationStatus.CONFIRMED);
+            Reservation savedReservation = reservationRepository.save(existing);
+            activityService.logActivity(
+                user.getId(),
+                "Rebooked " + timeSlot.getRoom().getName(),
+                "RESERVATION",
+                savedReservation.getId(),
+                timeSlot.getRoom().getName()
+            );
+            return toResponse(savedReservation);
         }
-
+ 
         
         if (request.getTeamSize() > timeSlot.getRoom().getCapacity()) {
             throw new ValidationException("Team size exceeds room capacity");
         }
-
-        
-        double totalCost = timeSlot.getRoom().getPricePerHour() *
-                (timeSlot.getEndTime().toSecondOfDay() - timeSlot.getStartTime().toSecondOfDay()) / 3600.0;
-
-        Reservation reservation = new Reservation();
-        reservation.setSlot(timeSlot);
-        reservation.setUser(user);
-        reservation.setTeamSize(request.getTeamSize());
-        reservation.setTotalCost(totalCost);
-        reservation.setStatus(ReservationStatus.CONFIRMED);
-
-        Reservation savedReservation = reservationRepository.save(reservation);
-
-        activityService.logActivity(
-            user.getId(),
-            "Booked " + timeSlot.getRoom().getName(),
-            "RESERVATION",
-            savedReservation.getId(),
-            timeSlot.getRoom().getName()
-        );
-
-        return toResponse(savedReservation);
-    }
+ 
+         
+         double totalCost = timeSlot.getRoom().getPricePerHour() *
+                 (timeSlot.getEndTime().toSecondOfDay() - timeSlot.getStartTime().toSecondOfDay()) / 3600.0;
+ 
+         Reservation reservation = new Reservation();
+         reservation.setSlot(timeSlot);
+         reservation.setUser(user);
+         reservation.setTeamSize(request.getTeamSize());
+         reservation.setTotalCost(totalCost);
+         reservation.setStatus(ReservationStatus.CONFIRMED);
+ 
+         Reservation savedReservation = reservationRepository.save(reservation);
+ 
+         activityService.logActivity(
+             user.getId(),
+             "Booked " + timeSlot.getRoom().getName(),
+             "RESERVATION",
+             savedReservation.getId(),
+             timeSlot.getRoom().getName()
+         );
+ 
+         return toResponse(savedReservation);
+     }
 
     @CacheEvict(value = {"timeslots", "available-timeslots", "room-timeslots", "daterange-timeslots", "reservations", "user-reservations"}, allEntries = true)
     public ReservationResponse updateReservation(Long id, ReservationRequest request) {
@@ -167,6 +193,25 @@ public class ReservationService {
         } else {
             throw new ResourceNotFoundException("Reservation not found for this slot and user");
         }
+    }
+
+    public Optional<NearestReservationResponse> getNearestReservationForCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        List<Reservation> results = reservationRepository.findNearestByUserId(
+                user.getId(), today, now, PageRequest.of(0, 1));
+        if (results == null || results.isEmpty()) {
+            return Optional.empty();
+        }
+        Reservation r = results.get(0);
+        TimeSlot s = r.getSlot();
+        LocalDateTime startAt = LocalDateTime.of(s.getDate(), s.getStartTime());
+        return Optional.of(new NearestReservationResponse(r.getId(), s.getRoom().getName(), startAt));
     }
 
     private ReservationResponse toResponse(Reservation reservation) {
