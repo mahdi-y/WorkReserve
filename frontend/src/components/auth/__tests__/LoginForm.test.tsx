@@ -97,7 +97,6 @@ describe("LoginForm", () => {
 
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
     await user.type(screen.getByLabelText(/password/i), "password123");
-    // Use exact match for the submit button
     await user.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     await waitFor(() => {
@@ -122,7 +121,7 @@ describe("LoginForm", () => {
 
   it("displays loading state during submission", async () => {
     const user = userEvent.setup();
-    mockLogin.mockImplementation(() => new Promise(() => {})); // Never resolves
+    mockLogin.mockImplementation(() => new Promise(() => {})); 
 
     renderWithRouter(<LoginForm />);
 

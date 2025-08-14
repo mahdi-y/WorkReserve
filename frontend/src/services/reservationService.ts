@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import api from '../lib/api';
 
 export interface Reservation {
@@ -35,6 +36,12 @@ export interface ReservationRequest {
   teamSize: number;
 }
 
+export interface NearestReservation {
+  id: number;
+  roomName: string;
+  startAt: string; 
+}
+
 export const reservationService = {
   getAll: async (): Promise<Reservation[]> => {
     const res = await api.get('/reservations');
@@ -68,5 +75,18 @@ export const reservationService = {
   updateStatus: async (id: number, status: string): Promise<Reservation> => {
     const res = await api.put(`/reservations/${id}/status`, null, { params: { status } });
     return res.data;
+  },
+
+  getNearest: async (): Promise<NearestReservation | null> => {
+    try {
+      const res = await api.get('/reservations/nearest', { withCredentials: true });
+      if (res.status === 204) return null;
+      return res.data as NearestReservation;
+    } catch (err: any) {
+      if (err?.response && (err.response.status === 401 || err.response.status === 403)) {
+        return null;
+      }
+      throw err;
+    }
   }
 };

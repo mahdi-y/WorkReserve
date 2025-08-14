@@ -43,7 +43,7 @@ const PaymentSuccessPage: React.FC = () => {
       const { slotId, teamSize } = JSON.parse(bookingData);
       
       if (retryCount > 0) {
-        const delay = Math.min(2000 * Math.pow(2, retryCount), 15000); // Max 15 seconds
+        const delay = Math.min(2000 * Math.pow(2, retryCount), 15000); 
         await new Promise(resolve => setTimeout(resolve, delay));
       }
       

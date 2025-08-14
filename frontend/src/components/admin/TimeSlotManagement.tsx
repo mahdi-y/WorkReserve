@@ -74,7 +74,6 @@ const calendarStyles = `
     color: rgb(243 244 246);
   }
   
-  /* Popup overlay styles for dark mode */
   .rbc-overlay {
     background: white !important;
     border: 1px solid rgb(229 231 235) !important;

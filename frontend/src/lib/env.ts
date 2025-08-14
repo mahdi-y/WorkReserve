@@ -1,16 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export function getEnv(key: string, fallback?: string): string {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key] as string;
-  }
-  if (
-    typeof globalThis !== 'undefined' &&
-    (globalThis as any).import &&
-    (globalThis as any).import.meta &&
-    (globalThis as any).import.meta.env &&
-    (globalThis as any).import.meta.env[key]
-  ) {
-    return (globalThis as any).import.meta.env[key];
-  }
-  return fallback ?? '';
-}
+export const getEnv = (key: string): string | undefined => {
+  const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : undefined) as Record<string, any> | undefined;
+  const val = metaEnv?.[key] ?? (process?.env as any)?.[key];
+  if (val === undefined || val === null) return undefined;
+  return String(val);
+};

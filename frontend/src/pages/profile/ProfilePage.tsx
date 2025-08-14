@@ -655,7 +655,7 @@ const ProfilePage: React.FC = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" className="text-white-200">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
                       Once you delete your account, there is no going back. Please be certain.

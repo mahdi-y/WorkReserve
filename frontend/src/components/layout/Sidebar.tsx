@@ -6,7 +6,6 @@ import {
   Home,
   Building2,
   BookOpen,
-  Settings,
   User,
   LogOut,
   Shield,
@@ -43,7 +42,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Browse Rooms', href: '/rooms', icon: Building2 },
     { name: 'My Reservations', href: '/reservations', icon: BookOpen },
     { name: 'Profile', href: '/profile', icon: User },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
   if (user?.role === 'ADMIN') {

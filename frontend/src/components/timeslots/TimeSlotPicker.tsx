@@ -16,7 +16,7 @@ interface TimeSlotPickerProps {
   selectedDate: string;
   onTimeSlotSelect: (slot: any) => void;
   selectedTimeSlot: any;
-  loading?: boolean; //
+  loading?: boolean; 
   error?: string;  
 }
 

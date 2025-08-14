@@ -292,16 +292,9 @@ const MyReservationsPage: React.FC = () => {
             </div>
             <div className="flex gap-3">
               <Button 
-                onClick={() => navigate('/booking')}
-                className="bg-white text-blue-600 hover:bg-blue-50"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Booking
-              </Button>
-              <Button 
                 onClick={() => navigate('/rooms')}
                 variant="outline"
-                className="bg-white text-blue-600 hover:bg-blue-50"
+                className="bg-white text-blue-600"
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 Browse Rooms
