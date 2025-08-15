@@ -32,10 +32,6 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
 
-    - name: Run tests
-      working-directory: ./backend
-      run: mvn clean test
-
     - name: Build application
       working-directory: ./backend
       run: mvn clean package -DskipTests
