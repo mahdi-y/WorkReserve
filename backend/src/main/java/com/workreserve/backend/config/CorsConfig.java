@@ -15,9 +15,9 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000"
-             // "https://workreserve.com"
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*",
+            "https://*.azurestaticapps.net"
         ));
         
         configuration.setAllowedMethods(Arrays.asList(
