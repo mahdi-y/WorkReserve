@@ -1,0 +1,81 @@
+name: Deploy Frontend to Azure Static Web Apps
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'frontend/**'
+      - '.github/workflows/frontend-deploy.yml'
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run tests
+      working-directory: ./frontend
+      run: npm run test -- --ci --coverage --watchAll=false
+
+    - name: Build application
+      working-directory: ./frontend
+      env:
+        VITE_API_URL: https://${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}.azurewebsites.net/api
+        VITE_GOOGLE_CLIENT_ID: 806548124905-6tjbv3vifago6er61glf3t0f599lpadg.apps.googleusercontent.com
+        VITE_STRIPE_PUBLISHABLE_KEY: pk_test_51RnVBcQhUi6fqQVZdOkTJtEQV8NPwFpajxCGDDP3c5D1Yc0q2j0PenGOvAbU5mLo0pH96ikmw1fdP7oqXrtDlQEl00czDpCaR8
+      run: npm run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    
+    environment:
+      name: 'Production'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist
+
+    - name: Deploy to Azure Static Web Apps
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        action: 'upload'
+        app_location: 'frontend'
+        output_location: 'dist'
+        skip_app_build: true
+
+    - name: Get Static Web App URL
+      run: |
+        echo "Frontend deployed successfully!"
+        echo "Check Azure Portal for the Static Web App URL"
