@@ -19,8 +19,6 @@ import java.time.LocalTime;
 import com.workreserve.backend.timeslot.TimeSlotRepository;
 import com.workreserve.backend.activity.ActivityService;
 import com.workreserve.backend.config.FileStorageService;
-import com.workreserve.backend.user.User;
-import com.workreserve.backend.user.UserRepository;
 
 @Service
 public class RoomService {
@@ -37,8 +35,6 @@ public class RoomService {
     @Autowired
     private ActivityService activityService;
 
-    @Autowired
-    private UserRepository userRepository;
 
     @Cacheable("rooms")
     public List<RoomResponse> getAllRooms() {

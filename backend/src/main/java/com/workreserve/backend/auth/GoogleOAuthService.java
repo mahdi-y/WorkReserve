@@ -47,7 +47,6 @@ public class GoogleOAuthService {
             String name = (String) payload.get("name");
             String givenName = (String) payload.get("given_name");
             String familyName = (String) payload.get("family_name");
-            String pictureUrl = (String) payload.get("picture");
             Boolean emailVerified = payload.getEmailVerified();
 
             String fullName = name;
