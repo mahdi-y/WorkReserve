@@ -57,6 +57,21 @@ jobs:
       with:
         name: java-app
 
+    - name: Validate AZURE_WEBAPP_NAME secret
+      run: |
+        if [ -z "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
+          echo "ERROR: secret AZURE_WEBAPP_BACKEND_NAME is missing or empty"
+          exit 1
+        fi
+
+    - name: Validate publish profile matches app name
+      run: |
+        echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > publish-profile.xml
+        if ! grep -q "msdeploySite=\"${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}\"" publish-profile.xml; then
+          echo "ERROR: publish profile msdeploySite does not match AZURE_WEBAPP_BACKEND_NAME"
+          exit 1
+        fi
+
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
@@ -71,3 +86,4 @@ jobs:
         curl -f https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health || exit 1
         echo "Backend deployment successful!"
         echo "Backend URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+

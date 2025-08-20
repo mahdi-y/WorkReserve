@@ -1,3 +1,4 @@
 *.log
 jest_test.txt
 publish-profile-correct.xml
+publish-profile.xml
