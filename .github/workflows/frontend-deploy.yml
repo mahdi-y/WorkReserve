@@ -2,7 +2,7 @@ name: Deploy Frontend to Azure Static Web Apps
 
 on:
   push:
-    branches: [ azure-deploy ]
+    branches: [ ci/azure-deploy ]
     paths: 
       - 'frontend/**'
       - '.github/workflows/frontend-deploy.yml'
