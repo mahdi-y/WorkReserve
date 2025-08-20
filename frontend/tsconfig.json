@@ -11,8 +11,12 @@
     "noEmit": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
-    // ...other options...
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@": ["src"]
+    }
   },
   "include": ["src"]
 }
