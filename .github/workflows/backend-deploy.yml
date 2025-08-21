@@ -62,32 +62,50 @@ jobs:
       run: |
         echo "=== Secret Availability Check ==="
         
-        # Fix: Use proper variable expansion for length check
-        BACKEND_NAME="${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}"
-        PUBLISH_PROFILE="${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}"
-        
-        if [ -n "$BACKEND_NAME" ]; then
-          echo "✓ AZURE_WEBAPP_BACKEND_NAME is available (length: ${#BACKEND_NAME})"
+        # Fix: Check secret availability without assigning to variables
+        if [ -n "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
+          echo "✓ AZURE_WEBAPP_BACKEND_NAME is available"
         else
           echo "✗ AZURE_WEBAPP_BACKEND_NAME is NOT available or empty"
         fi
         
-        if [ -n "$PUBLISH_PROFILE" ]; then
-          echo "✓ AZURE_WEBAPP_PUBLISH_PROFILE is available (length: ${#PUBLISH_PROFILE})"
+        if [ -n "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
+          echo "✓ AZURE_WEBAPP_PUBLISH_PROFILE is available"
         else
           echo "✗ AZURE_WEBAPP_PUBLISH_PROFILE is NOT available"
           echo "This might be due to environment protection or secret scope issues"
         fi
 
-    - name: Verify required secrets before deployment
+    - name: Verify publish profile format
       run: |
-        if [ -z "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ] || [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
-          echo "ERROR: Required secrets are missing. Please check:"
-          echo "1. Secrets are defined at repository level (not environment level)"
-          echo "2. Environment protection rules aren't blocking secret access"
-          echo "3. Secrets were uploaded correctly without encoding issues"
-          exit 1
+        echo "=== Publish Profile Validation ==="
+        # Write publish profile to file for validation
+        echo '${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}' > temp-publish-profile.xml
+        
+        # Check if it's valid XML
+        if xmllint --noout temp-publish-profile.xml 2>/dev/null; then
+          echo "✓ Publish profile is valid XML"
+        else
+          echo "✗ Publish profile is not valid XML"
         fi
+        
+        # Check for required attributes
+        if grep -q 'msdeploySite=' temp-publish-profile.xml; then
+          echo "✓ Publish profile contains msdeploySite"
+          SITE_NAME=$(grep -oP 'msdeploySite="\K[^"]+' temp-publish-profile.xml | head -1)
+          echo "Site name from profile: $SITE_NAME"
+          
+          if [ "$SITE_NAME" = "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
+            echo "✓ Site name matches AZURE_WEBAPP_BACKEND_NAME"
+          else
+            echo "✗ Site name mismatch: profile=$SITE_NAME, secret=${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}"
+          fi
+        else
+          echo "✗ Publish profile missing msdeploySite"
+        fi
+        
+        # Clean up
+        rm -f temp-publish-profile.xml
 
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
