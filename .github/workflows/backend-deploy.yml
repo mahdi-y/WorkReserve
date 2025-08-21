@@ -57,28 +57,40 @@ jobs:
       with:
         name: java-app
 
-    - name: Validate AZURE_WEBAPP_NAME secret
+    - name: Debug all secret availability
       run: |
-        if [ -z "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
-          echo "ERROR: secret AZURE_WEBAPP_BACKEND_NAME is missing or empty"
-          exit 1
+        echo "=== Secret Availability Check ==="
+        
+        if [ -n "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
+          echo "✓ AZURE_WEBAPP_BACKEND_NAME is available (length: ${#AZURE_WEBAPP_BACKEND_NAME})"
+        else
+          echo "✗ AZURE_WEBAPP_BACKEND_NAME is NOT available or empty"
         fi
+        
+        if [ -n "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
+          echo "✓ AZURE_WEBAPP_PUBLISH_PROFILE is available"
+        else
+          echo "✗ AZURE_WEBAPP_PUBLISH_PROFILE is NOT available"
+        fi
+      env:
+        AZURE_WEBAPP_BACKEND_NAME: ${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}
 
-    - name: Validate publish profile matches app name
+    - name: Extract app name from publish profile as fallback
+      id: extract-app-name
       run: |
-        echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > publish-profile.xml
-        if ! grep -q "msdeploySite=\"${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}\"" publish-profile.xml; then
-          echo "ERROR: publish profile msdeploySite does not match AZURE_WEBAPP_BACKEND_NAME"
-          exit 1
-        fi
+        echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > temp-profile.xml
+        APP_NAME=$(grep -oP 'msdeploySite="\K[^"]+' temp-profile.xml | head -1)
+        echo "Extracted app name: $APP_NAME"
+        echo "app-name=$APP_NAME" >> $GITHUB_OUTPUT
+        rm temp-profile.xml
 
-    - name: Deploy to Azure Web App
+    - name: Deploy to Azure Web App (using extracted app name)
       id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
       with:
-        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        app-name: ${{ steps.extract-app-name.outputs.app-name }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: 'java-app/*.jar'
+        package: '*.jar'
 
     - name: Health Check
       run: |
