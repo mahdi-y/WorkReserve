@@ -46,80 +46,33 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test
     if: github.ref == 'refs/heads/ci/azure-deploy'
-    
-    # Remove environment constraint temporarily to test
-    # environment:
-    #   name: 'Production'
-    #   url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-
     steps:
-    - name: Download artifact from build job
-      uses: actions/download-artifact@v4
-      with:
-        name: java-app
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: java-app
 
-    - name: Debug secret availability (fixed syntax)
-      run: |
-        echo "=== Secret Availability Check ==="
-        
-        # Fix: Check secret availability without assigning to variables
-        if [ -n "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
-          echo "✓ AZURE_WEBAPP_BACKEND_NAME is available"
-        else
-          echo "✗ AZURE_WEBAPP_BACKEND_NAME is NOT available or empty"
-        fi
-        
-        if [ -n "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
-          echo "✓ AZURE_WEBAPP_PUBLISH_PROFILE is available"
-        else
-          echo "✗ AZURE_WEBAPP_PUBLISH_PROFILE is NOT available"
-          echo "This might be due to environment protection or secret scope issues"
-        fi
-
-    - name: Verify publish profile format
-      run: |
-        echo "=== Publish Profile Validation ==="
-        # Write publish profile to file for validation
-        echo '${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}' > temp-publish-profile.xml
-        
-        # Check if it's valid XML
-        if xmllint --noout temp-publish-profile.xml 2>/dev/null; then
-          echo "✓ Publish profile is valid XML"
-        else
-          echo "✗ Publish profile is not valid XML"
-        fi
-        
-        # Check for required attributes
-        if grep -q 'msdeploySite=' temp-publish-profile.xml; then
-          echo "✓ Publish profile contains msdeploySite"
-          SITE_NAME=$(grep -oP 'msdeploySite="\K[^"]+' temp-publish-profile.xml | head -1)
-          echo "Site name from profile: $SITE_NAME"
-          
-          if [ "$SITE_NAME" = "${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}" ]; then
-            echo "✓ Site name matches AZURE_WEBAPP_BACKEND_NAME"
-          else
-            echo "✗ Site name mismatch: profile=$SITE_NAME, secret=${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}"
+      - name: Validate we are using ZipDeploy profile
+        run: |
+          echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > temp-profile.xml
+          if ! grep -q 'publishMethod="ZipDeploy"' temp-profile.xml; then
+            echo "ERROR: Publish profile must be ZipDeploy for Linux App Service."
+            exit 1
           fi
-        else
-          echo "✗ Publish profile missing msdeploySite"
-        fi
-        
-        # Clean up
-        rm -f temp-publish-profile.xml
+          echo "ZipDeploy profile detected."
 
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: ${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: '*.jar'
+      - name: Deploy to Azure Web App (Linux ZipDeploy)
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}    # or AZURE_WEBAPP_PUBLISH_PROFILE_ZIP
+          package: 'java-app/*.jar'
 
-    - name: Health Check
-      run: |
-        sleep 30
-        APP_NAME="${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}"
-        curl -f "https://${APP_NAME}.azurewebsites.net/actuator/health" || exit 1
-        echo "Backend deployment successful!"
-        echo "Backend URL: https://${APP_NAME}.azurewebsites.net"
+      - name: Health Check
+        run: |
+          sleep 30
+          APP="${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}"
+          curl -f "https://${APP}.azurewebsites.net/actuator/health" || exit 1
+          echo "Backend deployment OK"
 
