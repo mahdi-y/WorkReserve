@@ -1,0 +1,42 @@
+# Maven build artifacts (except the final JAR)
+target/
+!target/*.jar
+
+# Source code (not needed in container)
+src/
+pom.xml
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Test files
+jest_test.txt
+
+# Configuration that shouldn't be in container
+application-secrets.properties
+src/main/resources/application-secrets.properties
+src/main/java/com/workreserve/backend/config/todo.java
