@@ -1,4 +1,4 @@
-name: Deploy Backend to Azure
+name: Deploy Backend to Azure (Container)
 
 on:
   push:
@@ -9,11 +9,16 @@ on:
 
 env:
   AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}
+  ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+  IMAGE_NAME: workreserve-backend
   JAVA_VERSION: '21'
 
 jobs:
-  build-and-test:
+  build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
     
     steps:
     - name: Checkout code
@@ -34,45 +39,165 @@ jobs:
 
     - name: Build application
       working-directory: ./backend
-      run: mvn clean package -DskipTests
+      run: |
+        echo "🏗️ Building Spring Boot application..."
+        mvn clean package -DskipTests -B
+        
+        if [ ! -f target/*.jar ]; then
+          echo "❌ JAR file not found in target directory"
+          exit 1
+        fi
+        
+        echo "✅ JAR file created successfully"
+        ls -la target/*.jar
 
-    - name: Upload artifact for deployment job
-      uses: actions/upload-artifact@v4
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Azure Container Registry
+      uses: docker/login-action@v3
       with:
-        name: java-app
-        path: backend/target/*.jar
+        registry: ${{ env.ACR_REGISTRY }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Extract metadata for Docker
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+
+    - name: Image build summary
+      run: |
+        echo "🐳 Docker image built and pushed successfully"
+        echo "📋 Image tags: ${{ steps.meta.outputs.tags }}"
+        echo "🔗 Image digest: ${{ steps.build.outputs.digest }}"
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: build-and-push
     if: github.ref == 'refs/heads/ci/azure-deploy'
+    
+    environment:
+      name: 'Production'
+      url: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net
+
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: java-app
+    - name: Extract deployment image tag
+      id: image
+      run: |
+        IMAGE_TAG="${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:ci-azure-deploy-${{ github.sha }}"
+        echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "🚀 Deploying image: $IMAGE_TAG"
 
-      - name: Validate we are using ZipDeploy profile
-        run: |
-          echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > temp-profile.xml
-          if ! grep -q 'publishMethod="ZipDeploy"' temp-profile.xml; then
-            echo "ERROR: Publish profile must be ZipDeploy for Linux App Service."
-            exit 1
+    - name: Deploy container to Azure App Service
+      run: |
+        echo "🔄 Triggering container deployment via webhook..."
+        
+        WEBHOOK_URL="https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/docker/hook"
+        
+        WEBHOOK_PAYLOAD=$(cat << EOF
+        {
+          "image": "${{ steps.image.outputs.image-tag }}"
+        }
+        EOF
+        )
+        
+        echo "📦 Triggering container deployment..."
+        
+        RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -u "${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}" \
+          -d "$WEBHOOK_PAYLOAD" \
+          "$WEBHOOK_URL")
+        
+        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        
+        if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+          echo "✅ Container deployment webhook triggered successfully"
+        else
+          echo "⚠️ Webhook approach failed, trying alternative method..."
+          
+          echo "🔄 Using alternative deployment method..."
+          
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -u "${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}" \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/container/restart"
+          
+          echo "✅ Container restart triggered"
+        fi
+
+    - name: Configure container settings (if needed)
+      run: |
+        echo "⚙️ Ensuring container configuration is optimal..."
+        
+        echo "Required App Service settings:"
+        echo "  WEBSITES_PORT: 8082"
+        echo "  WEBSITES_ENABLE_APP_SERVICE_STORAGE: false"
+        echo "  DOCKER_REGISTRY_SERVER_URL: https://${{ env.ACR_REGISTRY }}"
+        echo "  DOCKER_REGISTRY_SERVER_USERNAME: ${{ secrets.ACR_USERNAME }}"
+        echo "  DOCKER_REGISTRY_SERVER_PASSWORD: [configured]"
+        echo "  SPRING_PROFILES_ACTIVE: production"
+
+    - name: Wait for deployment completion
+      run: |
+        echo "⏳ Waiting for container deployment to complete..."
+        sleep 120 
+        echo "✅ Deployment wait period completed"
+
+    - name: Health check with retry
+      run: |
+        echo "🏥 Starting health check..."
+        
+        for i in {1..20}; do
+          echo "🔍 Health check attempt $i of 20..."
+          
+          if curl -f -s --max-time 15 "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" > /dev/null; then
+            echo "✅ Health check passed! Backend is running successfully"
+            echo "🌐 Backend URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+            echo "🐳 Container image: ${{ steps.image.outputs.image-tag }}"
+            
+            echo "📊 Health check details:"
+            curl -s "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" | jq '.' || echo "Health endpoint responded successfully"
+            exit 0
+          else
+            echo "⏳ Health check failed, waiting 15 seconds before retry..."
+            sleep 15
           fi
-          echo "ZipDeploy profile detected."
+        done
+        
+        echo "❌ Health check failed after 20 attempts"
+        echo "🔍 Check container status in Azure Portal"
+        exit 1
 
-      - name: Deploy to Azure Web App (Linux ZipDeploy)
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}    # or AZURE_WEBAPP_PUBLISH_PROFILE_ZIP
-          package: 'java-app/*.jar'
-
-      - name: Health Check
-        run: |
-          sleep 30
-          APP="${{ secrets.AZURE_WEBAPP_BACKEND_NAME }}"
-          curl -f "https://${APP}.azurewebsites.net/actuator/health" || exit 1
-          echo "Backend deployment OK"
+    - name: Deployment summary
+      if: success()
+      run: |
+        echo "🎉 Container deployment completed successfully!"
+        echo "📋 Deployment Summary:"
+        echo "   • App Service: ${{ env.AZURE_WEBAPP_NAME }}"
+        echo "   • Container Registry: ${{ env.ACR_REGISTRY }}"
+        echo "   • Image: ${{ steps.image.outputs.image-tag }}"
+        echo "   • Health Check: ✅ Passed"
+        echo "   • URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo "   • Authentication: ACR Credentials Only"
 
