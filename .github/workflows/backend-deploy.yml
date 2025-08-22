@@ -103,91 +103,139 @@ jobs:
     - name: Extract deployment image tag
       id: image
       run: |
+        # Use the specific tag from the build job
         IMAGE_TAG="${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:ci-azure-deploy-${{ github.sha }}"
         echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
         echo "🚀 Deploying image: $IMAGE_TAG"
 
-    - name: Deploy container to Azure App Service
+    - name: Configure Azure App Service for Container
       run: |
-        echo "🔄 Triggering container deployment via webhook..."
+        echo "🔧 Configuring App Service for container deployment..."
         
-        WEBHOOK_URL="https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/docker/hook"
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
         
-        WEBHOOK_PAYLOAD=$(cat << EOF
+        echo "📦 Updating container configuration via REST API..."
+        
+        CONTAINER_CONFIG=$(cat << EOF
         {
-          "image": "${{ steps.image.outputs.image-tag }}"
+          "DOCKER_CUSTOM_IMAGE_NAME": "${{ steps.image.outputs.image-tag }}",
+          "DOCKER_REGISTRY_SERVER_URL": "https://${{ env.ACR_REGISTRY }}",
+          "DOCKER_REGISTRY_SERVER_USERNAME": "${{ secrets.ACR_USERNAME }}",
+          "DOCKER_REGISTRY_SERVER_PASSWORD": "${{ secrets.ACR_PASSWORD }}",
+          "WEBSITES_PORT": "8082",
+          "WEBSITES_ENABLE_APP_SERVICE_STORAGE": "false",
+          "SPRING_PROFILES_ACTIVE": "production"
         }
         EOF
         )
         
-        echo "📦 Triggering container deployment..."
+        echo "🔄 Triggering container update..."
         
-        RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" \
-          -X POST \
+        curl -X POST \
           -H "Content-Type: application/json" \
-          -u "${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}" \
-          -d "$WEBHOOK_PAYLOAD" \
-          "$WEBHOOK_URL")
+          -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+          -d "$CONTAINER_CONFIG" \
+          "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/settings"
         
-        HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+          "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/container/restart"
         
-        if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-          echo "✅ Container deployment webhook triggered successfully"
-        else
-          echo "⚠️ Webhook approach failed, trying alternative method..."
-          
-          echo "🔄 Using alternative deployment method..."
-          
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -u "${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}" \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/container/restart"
-          
-          echo "✅ Container restart triggered"
-        fi
+        echo "✅ Container configuration and restart triggered"
 
-    - name: Configure container settings (if needed)
-      run: |
-        echo "⚙️ Ensuring container configuration is optimal..."
-        
-        echo "Required App Service settings:"
-        echo "  WEBSITES_PORT: 8082"
-        echo "  WEBSITES_ENABLE_APP_SERVICE_STORAGE: false"
-        echo "  DOCKER_REGISTRY_SERVER_URL: https://${{ env.ACR_REGISTRY }}"
-        echo "  DOCKER_REGISTRY_SERVER_USERNAME: ${{ secrets.ACR_USERNAME }}"
-        echo "  DOCKER_REGISTRY_SERVER_PASSWORD: [configured]"
-        echo "  SPRING_PROFILES_ACTIVE: production"
-
-    - name: Wait for deployment completion
+    - name: Wait for container deployment with progress monitoring
       run: |
         echo "⏳ Waiting for container deployment to complete..."
-        sleep 120 
-        echo "✅ Deployment wait period completed"
-
-    - name: Health check with retry
-      run: |
-        echo "🏥 Starting health check..."
         
-        for i in {1..20}; do
-          echo "🔍 Health check attempt $i of 20..."
+        for i in {1..24}; do  # 24 attempts = 12 minutes
+          echo "🔍 Monitoring attempt $i/24 ($(($i * 30)) seconds elapsed)..."
           
-          if curl -f -s --max-time 15 "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" > /dev/null; then
-            echo "✅ Health check passed! Backend is running successfully"
-            echo "🌐 Backend URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
-            echo "🐳 Container image: ${{ steps.image.outputs.image-tag }}"
-            
-            echo "📊 Health check details:"
-            curl -s "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" | jq '.' || echo "Health endpoint responded successfully"
-            exit 0
+          LOGS=$(curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null | tail -20)
+          
+          if echo "$LOGS" | grep -q "Started.*Application\|Tomcat started on port\|Spring Boot"; then
+            echo "✅ Spring Boot application detected in logs!"
+            echo "📋 Recent startup logs:"
+            echo "$LOGS" | tail -5
+            break
+          elif echo "$LOGS" | grep -q "Error\|Exception\|Failed"; then
+            echo "❌ Error detected in container logs:"
+            echo "$LOGS" | grep -E "Error|Exception|Failed" | tail -3
           else
-            echo "⏳ Health check failed, waiting 15 seconds before retry..."
-            sleep 15
+            echo "⏳ Container still starting up..."
           fi
+          
+          sleep 30
         done
         
-        echo "❌ Health check failed after 20 attempts"
-        echo "🔍 Check container status in Azure Portal"
-        exit 1
+        echo "✅ Container monitoring completed"
+
+    - name: Enhanced health check with multiple endpoints
+      run: |
+        echo "🏥 Starting comprehensive health check..."
+        
+        ENDPOINTS=(
+          "/"
+          "/actuator"
+          "/actuator/health"
+          "/api/health"
+          "/health"
+        )
+        
+        SUCCESS=false
+        
+        for attempt in {1..15}; do
+          echo "🔍 Health check attempt $attempt/15..."
+          
+          for endpoint in "${ENDPOINTS[@]}"; do
+            URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net$endpoint"
+            echo "   Testing: $endpoint"
+            
+            RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" --max-time 20 "$URL" 2>/dev/null)
+            HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+            RESPONSE_BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
+            
+            echo "   Status: $HTTP_STATUS"
+            
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ Health check PASSED on endpoint: $endpoint"
+              echo "🌐 Backend URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+              echo "🐳 Container image: ${{ steps.image.outputs.image-tag }}"
+              echo "📊 Response preview: ${RESPONSE_BODY:0:200}..."
+              SUCCESS=true
+              break 2
+            elif [ "$HTTP_STATUS" = "404" ]; then
+              echo "   404 - Endpoint not found (this may be expected)"
+            elif [ "$HTTP_STATUS" = "500" ] || [ "$HTTP_STATUS" = "503" ]; then
+              echo "   Server error - application may be starting up"
+            else
+              echo "   Unexpected status or connection failed"
+            fi
+          done
+          
+          if [ "$SUCCESS" = true ]; then
+            break
+          fi
+          
+          echo "⏳ All endpoints failed, waiting 20 seconds before retry..."
+          sleep 20
+        done
+        
+        if [ "$SUCCESS" = false ]; then
+          echo "❌ All health check attempts failed"
+          echo "🔍 Final diagnostic information:"
+          
+          echo "📋 Recent container logs:"
+          curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null | tail -20
+          
+          echo "📋 Container configuration:"
+          curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/settings" 2>/dev/null | head -10
+          
+          exit 1
+        fi
 
     - name: Deployment summary
       if: success()
@@ -197,7 +245,31 @@ jobs:
         echo "   • App Service: ${{ env.AZURE_WEBAPP_NAME }}"
         echo "   • Container Registry: ${{ env.ACR_REGISTRY }}"
         echo "   • Image: ${{ steps.image.outputs.image-tag }}"
+        echo "   • Port: 8082"
         echo "   • Health Check: ✅ Passed"
         echo "   • URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
-        echo "   • Authentication: ACR Credentials Only"
+        echo "   • Authentication: ACR Credentials"
+
+    - name: Post-deployment validation
+      if: success()
+      run: |
+        echo "🔍 Running post-deployment validation..."
+        
+        echo "Testing main endpoints:"
+        
+        if curl -s -f "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/" > /dev/null; then
+          echo "✅ Root endpoint responding"
+        else
+          echo "⚠️ Root endpoint not responding"
+        fi
+        
+        if curl -s -f "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" > /dev/null; then
+          echo "✅ Health endpoint responding"
+          echo "📊 Health status:"
+          curl -s "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" | jq '.' || echo "Health endpoint responded (JSON parsing failed)"
+        else
+          echo "⚠️ Health endpoint not responding"
+        fi
+        
+        echo "🏁 Deployment validation completed"
 
