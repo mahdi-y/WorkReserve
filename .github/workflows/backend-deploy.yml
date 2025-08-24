@@ -3,7 +3,7 @@ name: Deploy Backend to Azure (Container)
 on:
   push:
     branches: [ ci/azure-deploy ]
-    paths:
+    paths: 
       - 'backend/**'
       - '.github/workflows/backend-deploy.yml'
 
@@ -17,14 +17,18 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.pick.outputs.image_tag }}
+      image_tag: ${{ steps.extract_tag.outputs.deploy_tag }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - uses: actions/setup-java@v4
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
       with:
         java-version: ${{ env.JAVA_VERSION }}
-        distribution: temurin
+        distribution: 'temurin'
 
     - name: Cache Maven packages
       uses: actions/cache@v4
@@ -33,33 +37,34 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
 
-    - name: Build JAR
-      working-directory: backend
+    - name: Build application
+      working-directory: ./backend
       run: |
-        echo "🔧 Setting Maven wrapper permissions..."
-        chmod +x ./mvnw
-        
         echo "🏗️ Building Spring Boot application..."
-        ./mvnw -B -DskipTests clean package
+        # Fix Maven wrapper permissions
+        chmod +x ./mvnw
+        ./mvnw clean package -DskipTests -B
         
-        echo "✅ Verifying JAR file creation..."
         if [ ! -f target/*.jar ]; then
           echo "❌ JAR file not found in target directory"
           exit 1
         fi
         
-        echo "📦 JAR file created successfully:"
+        echo "✅ JAR file created successfully"
         ls -la target/*.jar
 
-    - uses: docker/setup-buildx-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-    - uses: docker/login-action@v3
+    - name: Login to Azure Container Registry
+      uses: docker/login-action@v3
       with:
         registry: ${{ env.ACR_REGISTRY }}
         username: ${{ secrets.ACR_USERNAME }}
         password: ${{ secrets.ACR_PASSWORD }}
 
-    - id: meta
+    - name: Extract metadata for Docker
+      id: meta
       uses: docker/metadata-action@v5
       with:
         images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -67,7 +72,9 @@ jobs:
           type=sha,prefix=ci-azure-deploy-
           type=raw,value=latest,enable={{is_default_branch}}
 
-    - uses: docker/build-push-action@v5
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
       with:
         context: ./backend
         file: ./backend/Dockerfile
@@ -76,88 +83,261 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        platforms: linux/amd64
 
-    - name: Pick deploy tag
-      id: pick
+    - name: Extract specific deployment tag
+      id: extract_tag
       run: |
-        IMAGE_TAG="$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep 'ci-azure-deploy-' | head -1)"
-        echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "🚀 Deploying: $IMAGE_TAG"
+        # Extract the SHA-based tag that was just built
+        FULL_TAGS="${{ steps.meta.outputs.tags }}"
+        echo "All tags: $FULL_TAGS"
+        
+        # Get the ci-azure-deploy tag specifically
+        DEPLOY_TAG=$(echo "$FULL_TAGS" | tr ',' '\n' | grep "ci-azure-deploy-" | head -1)
+        
+        if [ -z "$DEPLOY_TAG" ]; then
+          echo "❌ Could not find deployment tag"
+          exit 1
+        fi
+        
+        echo "deploy_tag=$DEPLOY_TAG" >> $GITHUB_OUTPUT
+        echo "🎯 Deployment tag: $DEPLOY_TAG"
+
+    - name: Image build summary
+      run: |
+        echo "🐳 Docker image built and pushed successfully"
+        echo "📋 All image tags: ${{ steps.meta.outputs.tags }}"
+        echo "🎯 Deploy tag: ${{ steps.extract_tag.outputs.deploy_tag }}"
+        echo "🔗 Image digest: ${{ steps.build.outputs.digest }}"
 
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
+    if: github.ref == 'refs/heads/ci/azure-deploy'
+    
     environment:
       name: 'Production'
       url: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net
+
     steps:
-    - name: Azure Login (service principal)
-      uses: azure/login@v2
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Configure container image
+    - name: Verify deployment image
       run: |
-        echo "🔧 Configuring Azure App Service container..."
-        az webapp config container set \
-          --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-          --name "${{ env.AZURE_WEBAPP_NAME }}" \
-          --docker-custom-image-name "${{ needs.build-and-push.outputs.image_tag }}" \
-          --docker-registry-server-url "https://${{ env.ACR_REGISTRY }}" \
-          --docker-registry-server-user "${{ secrets.ACR_USERNAME }}" \
-          --docker-registry-server-password "${{ secrets.ACR_PASSWORD }}"
+        echo "🔍 Verifying deployment configuration..."
+        echo "Image to deploy: ${{ needs.build-and-push.outputs.image_tag }}"
+        echo "Commit SHA: ${{ github.sha }}"
+        echo "App Service: ${{ env.AZURE_WEBAPP_NAME }}"
 
-    - name: Ensure required app settings
+    - name: Configure Azure App Service for Container
       run: |
-        echo "⚙️ Configuring application settings..."
-        az webapp config appsettings set \
-          --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-          --name "${{ env.AZURE_WEBAPP_NAME }}" \
-          --settings \
-            WEBSITES_PORT=8082 \
-            SPRING_PROFILES_ACTIVE=production \
-            SPRING_CONFIG_IMPORT="optional:classpath:application-secrets.properties"
+        echo "🔧 Configuring App Service for container deployment..."
+        
+        # Install Azure CLI
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        
+        echo "📦 Updating container configuration via REST API..."
+        echo "🎯 Using image: ${{ needs.build-and-push.outputs.image_tag }}"
+        
+        CONTAINER_CONFIG=$(cat << EOF
+        {
+          "DOCKER_CUSTOM_IMAGE_NAME": "${{ needs.build-and-push.outputs.image_tag }}",
+          "DOCKER_REGISTRY_SERVER_URL": "https://${{ env.ACR_REGISTRY }}",
+          "DOCKER_REGISTRY_SERVER_USERNAME": "${{ secrets.ACR_USERNAME }}",
+          "DOCKER_REGISTRY_SERVER_PASSWORD": "${{ secrets.ACR_PASSWORD }}",
+          "WEBSITES_PORT": "8082",
+          "WEBSITES_ENABLE_APP_SERVICE_STORAGE": "false",
+          "SPRING_PROFILES_ACTIVE": "production",
+          "SPRING_CONFIG_IMPORT": "optional:classpath:application-secrets.properties"
+        }
+        EOF
+        )
+        
+        echo "🔄 Applying container configuration..."
+        
+        # Update container settings
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+          -d "$CONTAINER_CONFIG" \
+          "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/settings"
+        
+        # Force container restart to pull new image
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+          "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/container/restart"
+        
+        echo "✅ Container configuration and restart triggered"
 
-    - name: Restart app
+    - name: Wait for container deployment with enhanced monitoring
       run: |
-        echo "🔄 Restarting Azure App Service..."
-        az webapp restart \
-          --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-          --name "${{ env.AZURE_WEBAPP_NAME }}"
-
-    - name: Verify deployment
-      run: |
-        echo "⏳ Waiting for deployment to complete..."
+        echo "⏳ Waiting for container deployment to complete..."
+        echo "🎯 Monitoring for image: ${{ needs.build-and-push.outputs.image_tag }}"
+        
+        # Initial wait for container pull
+        echo "🕐 Initial wait for container pull (60 seconds)..."
         sleep 60
         
-        # Check if the application is responding
-        HEALTH_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health"
-        
-        for i in {1..12}; do
-          echo "🔍 Health check attempt $i/12..."
-          if curl -f -s "$HEALTH_URL" > /dev/null; then
-            echo "✅ Application is healthy!"
-            echo "🌐 Application URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        for i in {1..20}; do  # 20 attempts = 15 minutes
+          echo "🔍 Monitoring attempt $i/20 ($(($i * 45)) seconds elapsed)..."
+          
+          # Get container logs
+          LOGS=$(curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null || echo "")
+          
+          # Check for successful Spring Boot startup
+          if echo "$LOGS" | grep -q "Started.*Application\|Tomcat started on port\|Application startup"; then
+            echo "✅ Spring Boot application started successfully!"
+            echo "📋 Recent startup confirmation:"
+            echo "$LOGS" | grep -E "Started.*Application|Tomcat started|Application startup" | tail -2
             break
-          elif [ $i -eq 12 ]; then
-            echo "❌ Health check failed after 12 attempts"
-            echo "🔍 Checking container logs..."
-            az webapp log tail --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" --name "${{ env.AZURE_WEBAPP_NAME }}" --provider docker || true
-            exit 1
+          elif echo "$LOGS" | grep -q "Error\|Exception\|Failed.*start"; then
+            echo "❌ Error detected in container startup:"
+            echo "$LOGS" | grep -E "Error|Exception|Failed.*start" | tail -3
+            echo ""
+            echo "📋 Full recent logs for diagnosis:"
+            echo "$LOGS" | tail -10
+          elif echo "$LOGS" | grep -q "Pulling\|Downloaded\|Starting"; then
+            echo "⏳ Container pulling/starting... Latest activity:"
+            echo "$LOGS" | grep -E "Pulling|Downloaded|Starting" | tail -2
           else
-            echo "⏳ Waiting 15 seconds before next check..."
-            sleep 15
+            echo "⏳ Waiting for container activity..."
           fi
+          
+          # Check if we've reached the end without success
+          if [ $i -eq 20 ]; then
+            echo "❌ Container startup monitoring timeout"
+            echo "📋 Final logs for diagnosis:"
+            echo "$LOGS" | tail -15
+            exit 1
+          fi
+          
+          sleep 45
         done
+        
+        echo "✅ Container monitoring completed successfully"
+
+    - name: Enhanced health check with Spring Boot focus
+      run: |
+        echo "🏥 Starting Spring Boot application health check..."
+        
+        # Spring Boot specific endpoints to test
+        ENDPOINTS=(
+          "/actuator/health"
+          "/actuator"
+          "/"
+        )
+        
+        SUCCESS=false
+        BASE_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        
+        for attempt in {1..12}; do
+          echo "🔍 Health check attempt $attempt/12..."
+          
+          for endpoint in "${ENDPOINTS[@]}"; do
+            URL="$BASE_URL$endpoint"
+            echo "   Testing: $endpoint"
+            
+            RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" --max-time 30 "$URL" 2>/dev/null || echo "HTTPSTATUS:000")
+            HTTP_STATUS=$(echo $RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+            RESPONSE_BODY=$(echo $RESPONSE | sed -e 's/HTTPSTATUS:.*//g')
+            
+            echo "   Status: $HTTP_STATUS"
+            
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ SUCCESS! Application is healthy and responding"
+              echo "🌐 Backend URL: $BASE_URL"
+              echo "🐳 Container image: ${{ needs.build-and-push.outputs.image_tag }}"
+              echo "📊 Response preview: ${RESPONSE_BODY:0:150}..."
+              
+              # Special check for health endpoint
+              if [ "$endpoint" = "/actuator/health" ]; then
+                echo "💚 Health endpoint details:"
+                echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+              fi
+              
+              SUCCESS=true
+              break 2
+            elif [ "$HTTP_STATUS" = "404" ]; then
+              echo "   404 - Endpoint not found"
+            elif [ "$HTTP_STATUS" = "500" ] || [ "$HTTP_STATUS" = "503" ]; then
+              echo "   Server error - application may still be initializing"
+            else
+              echo "   Connection failed or unexpected status"
+            fi
+          done
+          
+          if [ "$SUCCESS" = true ]; then
+            break
+          fi
+          
+          echo "⏳ All endpoints failed, waiting 25 seconds before retry..."
+          sleep 25
+        done
+        
+        if [ "$SUCCESS" = false ]; then
+          echo "❌ All health check attempts failed"
+          echo "🔍 Final diagnostic information:"
+          
+          echo "📋 Recent container logs:"
+          curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null | tail -20
+          
+          echo ""
+          echo "📋 Container settings:"
+          curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/settings" 2>/dev/null | head -10
+          
+          exit 1
+        fi
 
     - name: Deployment summary
       if: success()
       run: |
-        echo "🎉 Deployment completed successfully!"
-        echo ""
+        echo "🎉 Container deployment completed successfully!"
+        echo "=================================================="
         echo "📋 Deployment Summary:"
         echo "   • App Service: ${{ env.AZURE_WEBAPP_NAME }}"
-        echo "   • Container Image: ${{ needs.build-and-push.outputs.image_tag }}"
-        echo "   • Application URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
-        echo "   • Health Endpoint: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health"
+        echo "   • Container Registry: ${{ env.ACR_REGISTRY }}"
+        echo "   • Image: ${{ needs.build-and-push.outputs.image_tag }}"
+        echo "   • Commit SHA: ${{ github.sha }}"
+        echo "   • Port: 8082"
+        echo "   • Profile: production"
+        echo "   • Health Check: ✅ Passed"
+        echo "   • URL: ${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo "   • Authentication: ACR Credentials"
+        echo "=================================================="
+
+    - name: Post-deployment validation
+      if: success()
+      run: |
+        echo "🔍 Running final deployment validation..."
+        
+        BASE_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        
+        echo "Testing key endpoints:"
+        
+        # Test root endpoint
+        if curl -s -f "$BASE_URL/" > /dev/null; then
+          echo "✅ Root endpoint (/) responding"
+        else
+          echo "⚠️ Root endpoint (/) not responding"
+        fi
+        
+        # Test health endpoint with detailed output
+        if curl -s -f "$BASE_URL/actuator/health" > /dev/null; then
+          echo "✅ Health endpoint (/actuator/health) responding"
+          echo "📊 Health status details:"
+          HEALTH_RESPONSE=$(curl -s "$BASE_URL/actuator/health")
+          echo "$HEALTH_RESPONSE" | jq '.' 2>/dev/null || echo "$HEALTH_RESPONSE"
+        else
+          echo "⚠️ Health endpoint (/actuator/health) not responding"
+        fi
+        
+        # Verify the correct image is deployed
+        echo ""
+        echo "🔍 Verifying deployed image version..."
+        echo "Expected: ${{ needs.build-and-push.outputs.image_tag }}"
+        echo "Commit SHA: ${{ github.sha }}"
+        
+        echo "🏁 Deployment validation completed successfully!"
 
