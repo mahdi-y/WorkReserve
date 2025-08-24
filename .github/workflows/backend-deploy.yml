@@ -26,9 +26,30 @@ jobs:
         java-version: ${{ env.JAVA_VERSION }}
         distribution: temurin
 
+    - name: Cache Maven packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
     - name: Build JAR
       working-directory: backend
-      run: ./mvnw -B -DskipTests clean package
+      run: |
+        echo "🔧 Setting Maven wrapper permissions..."
+        chmod +x ./mvnw
+        
+        echo "🏗️ Building Spring Boot application..."
+        ./mvnw -B -DskipTests clean package
+        
+        echo "✅ Verifying JAR file creation..."
+        if [ ! -f target/*.jar ]; then
+          echo "❌ JAR file not found in target directory"
+          exit 1
+        fi
+        
+        echo "📦 JAR file created successfully:"
+        ls -la target/*.jar
 
     - uses: docker/setup-buildx-action@v3
 
@@ -44,6 +65,7 @@ jobs:
         images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
           type=sha,prefix=ci-azure-deploy-
+          type=raw,value=latest,enable={{is_default_branch}}
 
     - uses: docker/build-push-action@v5
       with:
@@ -52,17 +74,22 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Pick deploy tag
       id: pick
       run: |
         IMAGE_TAG="$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep 'ci-azure-deploy-' | head -1)"
         echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "Deploying: $IMAGE_TAG"
+        echo "🚀 Deploying: $IMAGE_TAG"
 
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
+    environment:
+      name: 'Production'
+      url: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net
     steps:
     - name: Azure Login (service principal)
       uses: azure/login@v2
@@ -71,6 +98,7 @@ jobs:
 
     - name: Configure container image
       run: |
+        echo "🔧 Configuring Azure App Service container..."
         az webapp config container set \
           --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
           --name "${{ env.AZURE_WEBAPP_NAME }}" \
@@ -81,6 +109,7 @@ jobs:
 
     - name: Ensure required app settings
       run: |
+        echo "⚙️ Configuring application settings..."
         az webapp config appsettings set \
           --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
           --name "${{ env.AZURE_WEBAPP_NAME }}" \
@@ -91,30 +120,44 @@ jobs:
 
     - name: Restart app
       run: |
-        echo "Restarting Azure App Service..."
+        echo "🔄 Restarting Azure App Service..."
         az webapp restart \
           --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
           --name "${{ env.AZURE_WEBAPP_NAME }}"
 
     - name: Verify deployment
       run: |
-        echo "Waiting for deployment to complete..."
-        sleep 30
+        echo "⏳ Waiting for deployment to complete..."
+        sleep 60
         
         # Check if the application is responding
         HEALTH_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health"
         
-        for i in {1..10}; do
-          echo "Health check attempt $i/10..."
+        for i in {1..12}; do
+          echo "🔍 Health check attempt $i/12..."
           if curl -f -s "$HEALTH_URL" > /dev/null; then
             echo "✅ Application is healthy!"
+            echo "🌐 Application URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
             break
-          elif [ $i -eq 10 ]; then
-            echo "❌ Health check failed after 10 attempts"
+          elif [ $i -eq 12 ]; then
+            echo "❌ Health check failed after 12 attempts"
+            echo "🔍 Checking container logs..."
+            az webapp log tail --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" --name "${{ env.AZURE_WEBAPP_NAME }}" --provider docker || true
             exit 1
           else
             echo "⏳ Waiting 15 seconds before next check..."
             sleep 15
           fi
         done
+
+    - name: Deployment summary
+      if: success()
+      run: |
+        echo "🎉 Deployment completed successfully!"
+        echo ""
+        echo "📋 Deployment Summary:"
+        echo "   • App Service: ${{ env.AZURE_WEBAPP_NAME }}"
+        echo "   • Container Image: ${{ needs.build-and-push.outputs.image_tag }}"
+        echo "   • Application URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo "   • Health Endpoint: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health"
 
