@@ -41,7 +41,6 @@ jobs:
       working-directory: ./backend
       run: |
         echo "🏗️ Building Spring Boot application..."
-        # Fix Maven wrapper permissions
         chmod +x ./mvnw
         ./mvnw clean package -DskipTests -B
         
@@ -88,11 +87,7 @@ jobs:
     - name: Extract specific deployment tag
       id: extract_tag
       run: |
-        # Extract the SHA-based tag that was just built
         FULL_TAGS="${{ steps.meta.outputs.tags }}"
-        echo "All tags: $FULL_TAGS"
-        
-        # Get the ci-azure-deploy tag specifically
         DEPLOY_TAG=$(echo "$FULL_TAGS" | tr ',' '\n' | grep "ci-azure-deploy-" | head -1)
         
         if [ -z "$DEPLOY_TAG" ]; then
@@ -127,304 +122,83 @@ jobs:
         echo "Commit SHA: ${{ github.sha }}"
         echo "App Service: ${{ env.AZURE_WEBAPP_NAME }}"
 
+    - name: Install Azure CLI
+      run: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
     - name: Configure Azure App Service for Container
       run: |
         echo "🔧 Configuring App Service for container deployment..."
         
-        # Install Azure CLI
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        az webapp config container set \
+          --name ${{ env.AZURE_WEBAPP_NAME }} \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --docker-custom-image-name ${{ needs.build-and-push.outputs.image_tag }} \
+          --docker-registry-server-url https://${{ env.ACR_REGISTRY }} \
+          --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
+          --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
         
-        echo "📦 Updating container configuration via REST API..."
-        echo "🎯 Using image: ${{ needs.build-and-push.outputs.image_tag }}"
+        az webapp config appsettings set \
+          --name ${{ env.AZURE_WEBAPP_NAME }} \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --settings WEBSITES_PORT=8082 SPRING_PROFILES_ACTIVE=production WEBSITES_ENABLE_APP_SERVICE_STORAGE=false
         
-        CONTAINER_CONFIG=$(cat << EOF
-        {
-          "DOCKER_CUSTOM_IMAGE_NAME": "${{ needs.build-and-push.outputs.image_tag }}",
-          "DOCKER_REGISTRY_SERVER_URL": "https://${{ env.ACR_REGISTRY }}",
-          "DOCKER_REGISTRY_SERVER_USERNAME": "${{ secrets.ACR_USERNAME }}",
-          "DOCKER_REGISTRY_SERVER_PASSWORD": "${{ secrets.ACR_PASSWORD }}",
-          "WEBSITES_PORT": "8082",
-          "WEBSITES_ENABLE_APP_SERVICE_STORAGE": "false",
-          "SPRING_PROFILES_ACTIVE": "production"
-        }
-        EOF
-        )
-        
-        echo "🔄 Applying container configuration..."
-        
-        # Update container settings
-        curl -X POST \
-          -H "Content-Type: application/json" \
-          -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-          -d "$CONTAINER_CONFIG" \
-          "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/settings"
-        
-        # Force container restart to pull new image
-        curl -X POST \
-          -H "Content-Type: application/json" \
-          -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-          "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/container/restart"
-        
-        echo "✅ Container configuration and restart triggered"
+        echo "✅ Container configuration updated"
 
-    - name: Wait for container deployment with enhanced monitoring
+    - name: Wait for container state
       run: |
-        echo "⏳ Waiting for container deployment to complete..."
-        echo "🎯 Monitoring for image: ${{ needs.build-and-push.outputs.image_tag }}"
-        
-        # Initial wait for container pull
-        echo "🕐 Initial wait for container pull (60 seconds)..."
-        sleep 60
-        
-        for i in {1..20}; do  # 20 attempts = 15 minutes
-          echo "🔍 Monitoring attempt $i/20 ($(($i * 45)) seconds elapsed)..."
-          
-          # Get container logs
-          LOGS=$(curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null || echo "")
-          
-          # Check for successful Spring Boot startup
-          if echo "$LOGS" | grep -q "Started.*Application\|Tomcat started on port\|Application startup"; then
-            echo "✅ Spring Boot application started successfully!"
-            echo "📋 Recent startup confirmation:"
-            echo "$LOGS" | grep -E "Started.*Application|Tomcat started|Application startup" | tail -2
-            break
-          elif echo "$LOGS" | grep -q "Error\|Exception\|Failed.*start"; then
-            echo "❌ Error detected in container startup:"
-            echo "$LOGS" | grep -E "Error|Exception|Failed.*start" | tail -3
-            echo ""
-            echo "📋 Full recent logs for diagnosis:"
-            echo "$LOGS" | tail -10
-          elif echo "$LOGS" | grep -q "Pulling\|Downloaded\|Starting"; then
-            echo "⏳ Container pulling/starting... Latest activity:"
-            echo "$LOGS" | grep -E "Pulling|Downloaded|Starting" | tail -2
-          else
-            echo "⏳ Waiting for container activity..."
-          fi
-          
-          # Check if we've reached the end without success
-          if [ $i -eq 20 ]; then
-            echo "❌ Container startup monitoring timeout"
-            echo "📋 Final logs for diagnosis:"
-            echo "$LOGS" | tail -15
-            exit 1
-          fi
-          
-          sleep 45
-        done
-        
-        echo "✅ Container monitoring completed successfully"
+        echo "🐳 Waiting for container to reach 'Running' state..."
+        for i in {1..40}; do
+          STATE=$(az webapp show \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --query "state" -o tsv)
 
-    - name: Smart container deployment monitoring
-      run: |
-        echo "🚀 Starting intelligent container deployment monitoring..."
-        echo "🎯 Target image: ${{ needs.build-and-push.outputs.image_tag }}"
-        
-        DEPLOYMENT_START_TIME=$(date +%s)
-        MAX_DEPLOYMENT_TIME=1200  # 20 minutes maximum
-        CONTAINER_READY=false
-        APP_HEALTHY=false
-        
-        # Function to get container status from Azure
-        get_container_status() {
-          curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/container/status" 2>/dev/null | \
-            jq -r '.state // "unknown"' 2>/dev/null || echo "unknown"
-        }
-        
-        # Function to get deployment status
-        get_deployment_status() {
-          curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/deployments/latest" 2>/dev/null | \
-            jq -r '.status // "unknown"' 2>/dev/null || echo "unknown"
-        }
-        
-        # Function to check if correct image is deployed
-        verify_deployed_image() {
-          CURRENT_IMAGE=$(curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/settings" 2>/dev/null | \
-            jq -r '.DOCKER_CUSTOM_IMAGE_NAME // "unknown"' 2>/dev/null || echo "unknown")
-          
-          if [[ "$CURRENT_IMAGE" == *"${{ github.sha }}"* ]]; then
-            return 0
-          else
-            return 1
-          fi
-        }
-        
-        # Function to test application health
-        test_app_health() {
-          local health_response
-          health_response=$(curl -s -w "HTTPSTATUS:%{http_code}" --max-time 15 \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" 2>/dev/null || echo "HTTPSTATUS:000")
-          
-          local http_status
-          http_status=$(echo "$health_response" | sed -n 's/.*HTTPSTATUS:\([0-9]*\).*/\1/p')
-          
-          if [ "$http_status" = "200" ]; then
-            return 0
-          else
-            return 1
-          fi
-        }
-        
-        # Phase 1: Wait for container image deployment
-        echo "📦 Phase 1: Monitoring container image deployment..."
-        while true; do
-          CURRENT_TIME=$(date +%s)
-          ELAPSED=$((CURRENT_TIME - DEPLOYMENT_START_TIME))
-          
-          if [ $ELAPSED -gt $MAX_DEPLOYMENT_TIME ]; then
-            echo "❌ Deployment timeout after $((MAX_DEPLOYMENT_TIME/60)) minutes"
-            exit 1
-          fi
-          
-          echo "⏱️  Elapsed: ${ELAPSED}s - Checking image deployment status..."
-          
-          if verify_deployed_image; then
-            echo "✅ Correct container image is deployed"
+          if [ "$STATE" = "Running" ]; then
+            echo "✅ Container state: Running"
             break
           else
-            echo "⏳ Waiting for image deployment... (checking again in 10s)"
-            sleep 10
+            echo "⏳ State=$STATE, retrying in 15s..."
+            sleep 15
           fi
-        done
-        
-        # Phase 2: Wait for container to be running
-        echo "🐳 Phase 2: Monitoring container state transitions..."
-        while true; do
-          CURRENT_TIME=$(date +%s)
-          ELAPSED=$((CURRENT_TIME - DEPLOYMENT_START_TIME))
           
-          if [ $ELAPSED -gt $MAX_DEPLOYMENT_TIME ]; then
-            echo "❌ Container startup timeout after $((MAX_DEPLOYMENT_TIME/60)) minutes"
+          if [ $i -eq 40 ]; then
+            echo "❌ Timeout waiting for container to run"
             exit 1
           fi
-          
-          CONTAINER_STATE=$(get_container_status)
-          echo "📊 Container state: $CONTAINER_STATE (${ELAPSED}s elapsed)"
-          
-          case "$CONTAINER_STATE" in
-            "running"|"Running")
-              echo "✅ Container is running - proceeding to health checks"
-              CONTAINER_READY=true
-              break
-              ;;
-            "starting"|"Starting"|"pulling"|"Pulling")
-              echo "⏳ Container is starting/pulling... (checking again in 8s)"
-              sleep 8
-              ;;
-            "stopped"|"Stopped"|"failed"|"Failed")
-              echo "❌ Container failed to start - checking logs..."
-              curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-                "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null | tail -20
-              exit 1
-              ;;
-            *)
-              echo "⚠️ Unknown container state: $CONTAINER_STATE (checking again in 5s)"
-              sleep 5
-              ;;
-          esac
         done
-        
-        # Phase 3: Wait for Spring Boot application health
-        echo "🏥 Phase 3: Monitoring Spring Boot application health..."
-        HEALTH_CHECK_START=$(date +%s)
-        MAX_HEALTH_WAIT=300  # 5 minutes for app to become healthy
-        
-        while true; do
-          CURRENT_TIME=$(date +%s)
-          TOTAL_ELAPSED=$((CURRENT_TIME - DEPLOYMENT_START_TIME))
-          HEALTH_ELAPSED=$((CURRENT_TIME - HEALTH_CHECK_START))
+
+    - name: Wait for Spring Boot health
+      run: |
+        echo "🏥 Waiting for Spring Boot actuator health..."
+        for i in {1..40}; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" || echo "000")
           
-          if [ $HEALTH_ELAPSED -gt $MAX_HEALTH_WAIT ]; then
-            echo "❌ Application health check timeout after $((MAX_HEALTH_WAIT/60)) minutes"
-            echo "📋 Recent application logs:"
-            curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-              "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null | tail -15
-            exit 1
-          fi
-          
-          echo "🔍 Testing application health (${HEALTH_ELAPSED}s since container ready)..."
-          
-          if test_app_health; then
-            echo "✅ Application is healthy and responding!"
-            APP_HEALTHY=true
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Spring Boot is healthy!"
             break
           else
-            # Check for startup errors in logs
-            RECENT_LOGS=$(curl -s -u '${{ secrets.ACR_USERNAME }}:${{ secrets.ACR_PASSWORD }}' \
-              "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/logs/docker" 2>/dev/null | tail -10)
-            
-            if echo "$RECENT_LOGS" | grep -q "APPLICATION FAILED TO START\|Exception.*startup\|Error.*starting"; then
-              echo "❌ Application startup failure detected:"
-              echo "$RECENT_LOGS" | grep -E "APPLICATION FAILED TO START|Exception.*startup|Error.*starting"
-              exit 1
-            fi
-            
-            echo "⏳ Application not ready yet... (checking again in 12s)"
-            sleep 12
+            echo "⏳ Health not ready yet (status=$STATUS), retrying in 15s..."
+            sleep 15
+          fi
+          
+          if [ $i -eq 40 ]; then
+            echo "❌ Timeout waiting for health endpoint"
+            exit 1
           fi
         done
-        
-        TOTAL_DEPLOYMENT_TIME=$((CURRENT_TIME - DEPLOYMENT_START_TIME))
-        echo "🎉 Smart deployment monitoring completed successfully!"
-        echo "⏱️  Total deployment time: ${TOTAL_DEPLOYMENT_TIME} seconds"
-        echo "🐳 Container: Ready"
-        echo "🏥 Application: Healthy"
 
-    - name: Enhanced application readiness verification
+    - name: Enhanced readiness verification
       run: |
-        echo "🔬 Enhanced application readiness verification..."
-        
+        echo "🔬 Verifying actuator endpoints..."
         BASE_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        ENDPOINTS=( "/actuator/health" "/actuator/health/liveness" "/actuator/health/readiness" "/actuator/info" )
         
-        # Test multiple endpoints for comprehensive verification
-        ENDPOINTS=(
-          "/actuator/health"
-          "/actuator/health/readiness"
-          "/actuator/health/liveness"
-          "/actuator/info"
-        )
-        
-        echo "📊 Testing Spring Boot actuator endpoints:"
-        for endpoint in "${ENDPOINTS[@]}"; do
-          echo -n "   Testing $endpoint... "
-          
-          RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" --max-time 10 "$BASE_URL$endpoint" 2>/dev/null || echo "HTTPSTATUS:000")
-          HTTP_STATUS=$(echo "$RESPONSE" | sed -n 's/.*HTTPSTATUS:\([0-9]*\).*/\1/p')
-          
-          case "$HTTP_STATUS" in
-            200)
-              echo "✅ OK"
-              if [[ "$endpoint" == "/actuator/health" ]]; then
-                HEALTH_DETAILS=$(echo "$RESPONSE" | sed 's/HTTPSTATUS:.*//g')
-                echo "      Health status: $(echo "$HEALTH_DETAILS" | jq -r '.status // "Unknown"' 2>/dev/null || echo "Responding")"
-              fi
-              ;;
-            404)
-              echo "⚠️ Not Found (endpoint may not be enabled)"
-              ;;
-            *)
-              echo "❌ Status: $HTTP_STATUS"
-              ;;
-          esac
+        for ep in "${ENDPOINTS[@]}"; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$ep" || echo "000")
+          echo "   $ep -> HTTP $STATUS"
         done
         
-        # Verify container configuration
-        echo ""
-        echo "🔍 Verifying deployment configuration:"
-        echo "   Expected image: ${{ needs.build-and-push.outputs.image_tag }}"
-        echo "   Commit SHA: ${{ github.sha }}"
-        echo "   Application URL: $BASE_URL"
-        
-        # Test basic connectivity
-        echo ""
-        echo "🌐 Final connectivity test:"
-        if curl -s -f --max-time 10 "$BASE_URL/actuator/health" > /dev/null; then
-          echo "✅ Application is fully accessible and healthy"
-          echo "🚀 Deployment completed successfully!"
-        else
-          echo "⚠️ Basic health check failed - manual verification may be needed"
-        fi
-
+        echo "🌐 Connectivity test..."
+        curl -f "$BASE_URL/actuator/health" && echo "✅ Deployment succeeded"
