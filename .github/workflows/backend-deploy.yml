@@ -78,28 +78,30 @@ jobs:
         context: ./backend
         file: ./backend/Dockerfile
         push: true
-        tags: ${{ steps.meta.outputs.version }}
+        tags: ${{ steps.meta.outputs.tags }}  
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         platforms: linux/amd64
 
+
     - name: Extract specific deployment tag
       id: extract_tag
       run: |
-        FULL_TAGS="${{ steps.meta.outputs.version }}"
+        FULL_TAGS="${{ steps.meta.outputs.tags }}"   
         echo "All tags received:"
         echo "$FULL_TAGS"
-        
+
         DEPLOY_TAG=$(echo "$FULL_TAGS" | grep "ci-azure-deploy-" | head -1)
-        
+
         if [ -z "$DEPLOY_TAG" ]; then
           echo "❌ Could not find deployment tag"
           exit 1
         fi
-        
+
         echo "deploy_tag=$DEPLOY_TAG" >> $GITHUB_OUTPUT
         echo "🎯 Deployment tag: $DEPLOY_TAG"
+
 
 
     - name: Image build summary
