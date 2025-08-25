@@ -132,24 +132,22 @@ jobs:
       run: |
         curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
+    - name: Debug image tag
+      run: |
+        echo "Image tag to deploy: '${{ needs.build-and-push.outputs.image_tag }}'"
+
     - name: Configure Azure App Service for Container
       run: |
         echo "🔧 Configuring App Service for container deployment..."
-        
+
         az webapp config container set \
-          --name ${{ env.AZURE_WEBAPP_NAME }} \
-          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-          --docker-custom-image-name ${{ needs.build-and-push.outputs.image_tag }} \
-          --docker-registry-server-url https://${{ env.ACR_REGISTRY }} \
-          --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
-          --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
-        
-        az webapp config appsettings set \
-          --name ${{ env.AZURE_WEBAPP_NAME }} \
-          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-          --settings WEBSITES_PORT=8082 SPRING_PROFILES_ACTIVE=production WEBSITES_ENABLE_APP_SERVICE_STORAGE=false
-        
-        echo "✅ Container configuration updated"
+          --name "${{ env.AZURE_WEBAPP_NAME }}" \
+          --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+          --docker-custom-image-name "${{ needs.build-and-push.outputs.image_tag }}" \
+          --docker-registry-server-url "https://${{ env.ACR_REGISTRY }}" \
+          --docker-registry-server-user "${{ secrets.ACR_USERNAME }}" \
+          --docker-registry-server-password "${{ secrets.ACR_PASSWORD }}"
+
 
     - name: Wait for container state
       run: |
