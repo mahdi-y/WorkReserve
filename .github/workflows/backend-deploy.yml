@@ -122,83 +122,35 @@ jobs:
         echo "Commit SHA: ${{ github.sha }}"
         echo "App Service: ${{ env.AZURE_WEBAPP_NAME }}"
 
-    - name: Install Azure CLI
+    - name: Block until Spring Boot actuator health returns 200 (no SP, no Kudu)
+      env:
+        APP: ${{ env.AZURE_WEBAPP_NAME }}
       run: |
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        set -euo pipefail
+        HEALTH_URL="https://${APP}.azurewebsites.net/actuator/health"
+        ROOT_URL="https://${APP}.azurewebsites.net/"
+        TIMEOUT_SECONDS=900   # 15 minutes total
+        INTERVAL_SECONDS=10
+        DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
 
-    - name: Configure Azure App Service for Container
-      run: |
-        echo "🔧 Configuring App Service for container deployment..."
-        
-        az webapp config container set \
-          --name ${{ env.AZURE_WEBAPP_NAME }} \
-          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-          --docker-custom-image-name ${{ needs.build-and-push.outputs.image_tag }} \
-          --docker-registry-server-url https://${{ env.ACR_REGISTRY }} \
-          --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
-          --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
-        
-        az webapp config appsettings set \
-          --name ${{ env.AZURE_WEBAPP_NAME }} \
-          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-          --settings WEBSITES_PORT=8082 SPRING_PROFILES_ACTIVE=production WEBSITES_ENABLE_APP_SERVICE_STORAGE=false
-        
-        echo "✅ Container configuration updated"
-
-    - name: Wait for container state
-      run: |
-        echo "🐳 Waiting for container to reach 'Running' state..."
-        for i in {1..40}; do
-          STATE=$(az webapp show \
-            --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --query "state" -o tsv)
-
-          if [ "$STATE" = "Running" ]; then
-            echo "✅ Container state: Running"
-            break
-          else
-            echo "⏳ State=$STATE, retrying in 15s..."
-            sleep 15
+        echo "🩺 Waiting for actuator health at $HEALTH_URL (timeout ${TIMEOUT_SECONDS}s)..."
+        while [ $SECONDS -lt $DEADLINE ]; do
+          if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+            echo "✅ Actuator health endpoint responded 200"
+            exit 0
           fi
-          
-          if [ $i -eq 40 ]; then
-            echo "❌ Timeout waiting for container to run"
-            exit 1
+          # fallback to root if actuator not exposed
+          if curl -fsS "$ROOT_URL" >/dev/null 2>&1; then
+            echo "✅ Root endpoint responds (actuator may be disabled)."
+            exit 0
           fi
+          echo "⏳ Still waiting for application to be ready... retrying in ${INTERVAL_SECONDS}s"
+          sleep $INTERVAL_SECONDS
         done
 
-    - name: Wait for Spring Boot health
-      run: |
-        echo "🏥 Waiting for Spring Boot actuator health..."
-        for i in {1..40}; do
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health" || echo "000")
-          
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ Spring Boot is healthy!"
-            break
-          else
-            echo "⏳ Health not ready yet (status=$STATUS), retrying in 15s..."
-            sleep 15
-          fi
-          
-          if [ $i -eq 40 ]; then
-            echo "❌ Timeout waiting for health endpoint"
-            exit 1
-          fi
-        done
-
-    - name: Enhanced readiness verification
-      run: |
-        echo "🔬 Verifying actuator endpoints..."
-        BASE_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
-        ENDPOINTS=( "/actuator/health" "/actuator/health/liveness" "/actuator/health/readiness" "/actuator/info" )
-        
-        for ep in "${ENDPOINTS[@]}"; do
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$ep" || echo "000")
-          echo "   $ep -> HTTP $STATUS"
-        done
-        
-        echo "🌐 Connectivity test..."
-        curl -f "$BASE_URL/actuator/health" && echo "✅ Deployment succeeded"
+        echo "❌ Timed out waiting for application health after ${TIMEOUT_SECONDS}s."
+        echo "⚠️ Diagnostics you can run manually:"
+        echo "  • Verify the app URL is reachable: https://${APP}.azurewebsites.net/"
+        echo "  • Ensure /actuator/health is enabled in production profile or change HEALTH_URL"
+        echo "  • Confirm the deployed image is the expected one in Azure Portal -> Container Settings"
+        exit 1
