@@ -88,7 +88,10 @@ jobs:
       id: extract_tag
       run: |
         FULL_TAGS="${{ steps.meta.outputs.tags }}"
-        DEPLOY_TAG=$(echo "$FULL_TAGS" | tr ',' '\n' | grep "ci-azure-deploy-" | head -1)
+        echo "All tags received:"
+        echo "$FULL_TAGS"
+        
+        DEPLOY_TAG=$(echo "$FULL_TAGS" | grep "ci-azure-deploy-" | head -1)
         
         if [ -z "$DEPLOY_TAG" ]; then
           echo "❌ Could not find deployment tag"
@@ -97,6 +100,7 @@ jobs:
         
         echo "deploy_tag=$DEPLOY_TAG" >> $GITHUB_OUTPUT
         echo "🎯 Deployment tag: $DEPLOY_TAG"
+
 
     - name: Image build summary
       run: |
