@@ -20,6 +20,6 @@ COPY --from=builder /app/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=production
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -fsS "http://localhost:${PORT}/api/health" || exit 1
+  CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-10000}/api/health" || exit 1'
 
 ENTRYPOINT ["java","-jar","app.jar"]

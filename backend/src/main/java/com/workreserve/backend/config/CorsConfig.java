@@ -13,23 +13,22 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:5173,https://workreserve-frontend.onrender.com,http://localhost:3000}")
-    private String allowedOrigins;
+  @Value("${cors.allowed-origins:http://localhost:5173,https://workreserve-frontend.onrender.com,http://localhost:3000}")
+  private String allowedOrigins;
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration cfg = new CorsConfiguration();
+    List<String> origins = Arrays.asList(allowedOrigins.split(","));
+    cfg.setAllowedOrigins(origins);
+    cfg.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+    cfg.setAllowedHeaders(Arrays.asList("*"));
+    cfg.setExposedHeaders(Arrays.asList("Authorization"));
+    cfg.setAllowCredentials(true);
+    cfg.setMaxAge(3600L);
 
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOrigins(origins);
-        configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", cfg);
+    return source;
+  }
 }
