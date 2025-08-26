@@ -18,10 +18,10 @@ import java.util.List;
 @Service
 public class FileStorageService {
 
-    @Value("${app.upload.dir:${user.home}/workreserve/uploads}")
+    @Value("${app.upload.dir:/tmp/workreserve/uploads}")
     private String uploadDir;
 
-    @Value("${app.base.url:http://localhost:8082}")
+    @Value("${app.base.url:https://workreserve-backend.onrender.com}")
     private String baseUrl;
 
     private final List<String> allowedImageTypes = Arrays.asList(
@@ -47,6 +47,7 @@ public class FileStorageService {
             return baseUrl + "/uploads/" + folder + "/" + filename;
 
         } catch (IOException ex) {
+            System.err.println("File storage error: " + ex.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, 
                 "Could not store file. Please try again.");
         }
@@ -60,7 +61,7 @@ public class FileStorageService {
                 Files.deleteIfExists(file);
             }
         } catch (IOException ex) {
-            System.err.println("Could not delete file: " + filePath);
+            System.err.println("Could not delete file: " + filePath + " - " + ex.getMessage());
         }
     }
 
