@@ -8,7 +8,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  withCredentials: false, 
+  timeout: 10000, 
 });
 
 api.interceptors.request.use(
@@ -46,12 +47,14 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return api(originalRequest);
         }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (refreshError) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
     }
 
