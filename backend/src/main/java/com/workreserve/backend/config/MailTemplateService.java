@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -14,6 +15,9 @@ public class MailTemplateService {
 
     @Autowired
     private JavaMailSender mailSender;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     private static final String BASE_TEMPLATE = """
         <!DOCTYPE html>
@@ -69,12 +73,12 @@ public class MailTemplateService {
             <h2>Welcome to WorkReserve, %s! 🎉</h2>
             <p>Thank you for signing up! We're excited to have you join our workspace community.</p>
             <p>To complete your registration and start booking workspaces, please verify your email address by clicking the button below:</p>
-            <a href="http://localhost:3000/verify-email?token=%s" class="button">Verify Email Address</a>
+            <a href="%s/verify-email?token=%s" class="button">Verify Email Address</a>
             <div class="info-box">
                 <p><strong>Security Note:</strong> This verification link will expire in 24 hours for your security.</p>
             </div>
             <p>If you didn't create this account, you can safely ignore this email.</p>
-            """, fullName, verificationToken);
+            """, fullName, frontendUrl, verificationToken);
         
         sendEmail(to, "Welcome to WorkReserve - Verify Your Email", content);
     }
@@ -85,7 +89,7 @@ public class MailTemplateService {
             <p>Hi %s,</p>
             <p>We received a request to reset your password for your WorkReserve account.</p>
             <p>Click the button below to create a new password:</p>
-            <a href="http://localhost:3000/reset-password?token=%s" class="button">Reset Password</a>
+            <a href="%s/reset-password?token=%s" class="button">Reset Password</a>
             <div class="info-box">
                 <p><strong>Security Information:</strong></p>
                 <ul style="margin: 10px 0; padding-left: 20px;">
@@ -95,7 +99,7 @@ public class MailTemplateService {
                 </ul>
             </div>
             <p>For security reasons, we recommend choosing a strong password that you haven't used before.</p>
-            """, fullName, resetToken);
+            """, fullName, frontendUrl, resetToken);
         
         sendEmail(to, "Reset Your WorkReserve Password", content);
     }
@@ -106,13 +110,13 @@ public class MailTemplateService {
             <p>Hi %s,</p>
             <p>Your WorkReserve account has been temporarily locked due to multiple failed login attempts.</p>
             <p>For your security, please click the button below to unlock your account:</p>
-            <a href="http://localhost:3000/unlock-account?token=%s" class="button">Unlock Account</a>
+            <a href="%s/unlock-account?token=%s" class="button">Unlock Account</a>
             <div class="info-box">
                 <p><strong>Why was my account locked?</strong></p>
                 <p>We lock accounts after several unsuccessful login attempts to protect your account from unauthorized access.</p>
             </div>
             <p>If you believe this was a mistake or you're concerned about unauthorized access, please contact our support team.</p>
-            """, fullName, unlockToken);
+            """, fullName, frontendUrl, unlockToken);
         
         sendEmail(to, "WorkReserve Account Locked - Action Required", content);
     }
@@ -129,9 +133,9 @@ public class MailTemplateService {
                 <p><strong>Time:</strong> %s</p>
             </div>
             <p>Please arrive on time and bring a valid ID. You can view or modify your booking in your dashboard.</p>
-            <a href="http://localhost:3000/dashboard/bookings" class="button">View My Bookings</a>
+            <a href="%s/dashboard/bookings" class="button">View My Bookings</a>
             <p>We look forward to seeing you at WorkReserve!</p>
-            """, fullName, roomName, bookingDate, timeSlot);
+            """, fullName, roomName, bookingDate, timeSlot, frontendUrl);
         
         sendEmail(to, "Booking Confirmed - " + roomName, content);
     }
@@ -147,8 +151,8 @@ public class MailTemplateService {
                 <p><strong>Date:</strong> %s</p>
             </div>
             <p>If you need to make a new booking, you can browse available workspaces in your dashboard.</p>
-            <a href="http://localhost:3000/rooms" class="button">Browse Workspaces</a>
-            """, fullName, roomName, bookingDate);
+            <a href="%s/rooms" class="button">Browse Workspaces</a>
+            """, fullName, roomName, bookingDate, frontendUrl);
         
         sendEmail(to, "Booking Cancelled - " + roomName, content);
     }
@@ -168,10 +172,10 @@ public class MailTemplateService {
                     <li>Update your profile settings</li>
                 </ul>
             </div>
-            <a href="http://localhost:3000/rooms" class="button">Start Booking</a>
+            <a href="%s/rooms" class="button">Start Booking</a>
             <div class="divider"></div>
             <p>If you have any questions, our support team is here to help!</p>
-            """, fullName);
+            """, fullName, frontendUrl);
         
         sendEmail(to, "Welcome to WorkReserve - Let's Get Started!", content);
     }
