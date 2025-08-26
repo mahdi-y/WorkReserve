@@ -13,7 +13,7 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
     
-    @Value("${cors.allowed-origins}")
+    @Value("${cors.allowed-origins:http://localhost:5173,https://workreserve-frontend.onrender.com,http://localhost:3000}")
     private String allowedOrigins;
 
     @Bean
@@ -27,13 +27,22 @@ public class CorsConfig {
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
         
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Cache-Control", 
+            "Content-Type",
+            "Accept",
+            "X-Requested-With",
+            "Access-Control-Allow-Origin",
+            "Access-Control-Allow-Headers",
+            "Origin"
+        ));
         
         configuration.setAllowCredentials(true);
         
         configuration.setExposedHeaders(Arrays.asList(
             "Authorization",
-            "Access-Control-Allow-Origin",
+            "Access-Control-Allow-Origin", 
             "Access-Control-Allow-Credentials"
         ));
         
