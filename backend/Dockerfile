@@ -14,15 +14,12 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-
+RUN apk add --no-cache curl
 COPY --from=builder /app/target/*.jar app.jar
 
 ENV SPRING_PROFILES_ACTIVE=production
-ENV SERVER_PORT=10000
-
-EXPOSE 10000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${SERVER_PORT}/api/health || exit 1
+  CMD curl -fsS "http://localhost:${PORT}/api/health" || exit 1
 
-ENTRYPOINT ["java", "-Dserver.port=${SERVER_PORT}", "-jar", "app.jar"]
+ENTRYPOINT ["java","-jar","app.jar"]
