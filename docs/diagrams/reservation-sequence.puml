@@ -1,0 +1,134 @@
+@startuml Room Reservation Workflow
+
+title WorkReserve - Room Reservation Sequence Diagram
+
+actor User
+participant "Frontend\n(React)" as Frontend
+participant "TimeSlotController" as TimeSlotController
+participant "ReservationController" as ReservationController
+participant "ReservationService" as ReservationService
+participant "PaymentService" as PaymentService
+participant "Stripe API" as Stripe
+participant "Cache\n(Caffeine)" as Cache
+participant "Database" as DB
+participant "Activity Service" as ActivityService
+
+== Step 1: Browse Available Rooms and Time Slots ==
+
+User -> Frontend: Navigate to booking page
+Frontend -> TimeSlotController: GET /api/timeslots/available\n?date=2024-01-15&roomId=1
+
+TimeSlotController -> Cache: Check available timeslots cache
+alt Cache hit
+    Cache --> TimeSlotController: Cached availability data
+else Cache miss
+    TimeSlotController -> DB: Query available time slots
+    DB --> TimeSlotController: Available time slots
+    TimeSlotController -> Cache: Store in cache
+end
+
+TimeSlotController --> Frontend: 200 OK\n[available time slots]
+Frontend --> User: Display calendar with\navailable time slots
+
+== Step 2: Check Availability (Real-time) ==
+
+User -> Frontend: Select specific time slot
+Frontend -> TimeSlotController: GET /api/timeslots/{slotId}/availability
+
+TimeSlotController -> DB: Check current reservations\nfor time slot
+DB --> TimeSlotController: Reservation status
+
+alt Time slot already reserved
+    TimeSlotController --> Frontend: 409 Conflict\n{available: false}
+    Frontend --> User: Show "Time slot unavailable"
+else Time slot available
+    TimeSlotController --> Frontend: 200 OK\n{available: true}
+    Frontend --> User: Allow reservation
+end
+
+== Step 3: Create Reservation (with Payment) ==
+
+User -> Frontend: Fill reservation form\n(team size, confirm details)
+Frontend -> Frontend: Validate team size ≤ room capacity
+
+User -> Frontend: Proceed to payment
+Frontend -> PaymentService: POST /api/payments/create-intent
+note right: Frontend calls payment endpoint first
+
+PaymentService -> PaymentService: Calculate total cost\n(pricePerHour × duration)
+PaymentService -> Stripe: Create PaymentIntent
+Stripe --> PaymentService: PaymentIntent with client_secret
+PaymentService --> Frontend: 200 OK\n{clientSecret, paymentIntentId}
+
+Frontend -> Frontend: Initialize Stripe Elements\nwith client secret
+Frontend --> User: Display payment form
+
+User -> Frontend: Enter payment details
+Frontend -> Stripe: Confirm payment\n(via Stripe Elements)
+
+alt Payment failed
+    Stripe --> Frontend: Payment failed
+    Frontend --> User: Display payment error
+    note right: Process ends here
+else Payment succeeded
+    Stripe --> Frontend: Payment succeeded
+    Frontend -> ReservationController: POST /api/reservations\n{slotId, teamSize, paymentIntentId}
+end
+
+== Step 4: Create Reservation After Payment ==
+
+ReservationController -> ReservationService: createReservation(request)
+ReservationService -> DB: Get authenticated user
+ReservationService -> DB: Get time slot details
+
+' Validation checks
+alt Time slot not found
+    ReservationService --> ReservationController: ResourceNotFoundException
+    ReservationController --> Frontend: 404 Not Found
+else Slot already reserved (race condition)
+    ReservationService -> DB: Check existing reservations
+    ReservationService --> ReservationController: ConflictException
+    ReservationController --> Frontend: 409 Conflict
+    Frontend --> User: "Slot no longer available"
+else Team size exceeds capacity
+    ReservationService --> ReservationController: ValidationException
+    ReservationController --> Frontend: 400 Bad Request
+    Frontend --> User: "Team size too large"
+else Valid reservation
+    ' Verify payment was successful
+    ReservationService -> PaymentService: isPaymentSucceeded(paymentIntentId)
+    PaymentService -> Stripe: Retrieve PaymentIntent
+    Stripe --> PaymentService: PaymentIntent status
+    
+    alt Payment not succeeded
+        PaymentService --> ReservationService: false
+        ReservationService --> ReservationController: PaymentException
+        ReservationController --> Frontend: 402 Payment Required
+    else Payment succeeded
+        PaymentService --> ReservationService: true
+        
+        ' Create reservation
+        ReservationService -> ReservationService: Create reservation entity\n(CONFIRMED status)
+        ReservationService -> DB: Save reservation
+        DB --> ReservationService: Saved reservation
+        
+        ' Clear caches
+        ReservationService -> Cache: Evict cached data\n(timeslots, availability, reservations)
+        
+        ' Log activity
+        ReservationService -> ActivityService: logActivity("RESERVATION_CREATED")
+        
+        ReservationService --> ReservationController: ReservationResponse
+        ReservationController --> Frontend: 201 Created\n{reservation details}
+        Frontend --> User: Show success message\nand reservation details
+    end
+end
+
+== Step 5: Confirmation and Notifications ==
+
+Frontend -> Frontend: Update UI with new reservation
+Frontend -> Frontend: Navigate to "My Reservations"
+
+note over User, DB: **Key Features:**\n• Real-time availability checking\n• Payment-first approach (no reservation without payment)\n• Race condition protection via database constraints\n• Cache invalidation for data consistency\n• Activity logging for audit trail\n• Comprehensive error handling
+
+@enduml

@@ -1,0 +1,214 @@
+@startuml Admin Dashboard Usage
+
+title WorkReserve - Admin Dashboard Sequence Diagram
+
+actor Admin
+participant "Frontend\n(Admin Dashboard)" as Frontend
+participant "AdminController" as AdminController
+participant "UserController" as UserController
+participant "RoomController" as RoomController
+participant "AdminService" as AdminService
+participant "UserService" as UserService
+participant "RoomService" as RoomService
+participant "Cache\n(Caffeine)" as Cache
+participant "Database" as DB
+participant "ActivityService" as ActivityService
+
+== Step 1: Admin Authentication & Access ==
+
+Admin -> Frontend: Login with admin credentials
+note right: Uses same authentication flow\nbut with ADMIN role
+
+Frontend -> Frontend: Check user role = ADMIN
+alt Not admin user
+    Frontend --> Admin: Access denied\n(redirect to user dashboard)
+else Admin user authorized
+    Frontend -> Frontend: Load admin dashboard
+end
+
+== Step 2: Fetch Analytics and Dashboard Data ==
+
+Admin -> Frontend: Navigate to admin dashboard
+Frontend -> AdminController: GET /api/admin/analytics
+
+AdminController -> AdminService: getAnalytics()
+AdminService -> Cache: Check analytics cache
+alt Cache hit
+    Cache --> AdminService: Cached analytics data
+else Cache miss
+    AdminService -> DB: Query multiple tables\n(users, reservations, payments, rooms)
+    
+    par Parallel data fetching
+        AdminService -> DB: Get total users count
+        and
+        AdminService -> DB: Get total reservations
+        and
+        AdminService -> DB: Get revenue data
+        and
+        AdminService -> DB: Get room usage statistics
+        and
+        AdminService -> DB: Get recent activities
+    end
+    
+    DB --> AdminService: Aggregated analytics data
+    AdminService -> Cache: Store analytics in cache\n(5-minute expiry)
+end
+
+AdminService --> AdminController: AnalyticsResponse\n{userStats, reservationStats, revenueStats, roomStats}
+AdminController --> Frontend: 200 OK\n{analytics data}
+Frontend --> Admin: Display dashboard widgets\n(charts, KPIs, tables)
+
+== Step 3: User Management Operations ==
+
+Admin -> Frontend: Click "Manage Users" tab
+Frontend -> UserController: GET /api/users\n?page=1&size=20&search=email
+
+UserController -> UserService: getUsersForAdmin(params)
+UserService -> Cache: Check users cache
+alt Cache hit
+    Cache --> UserService: Cached user data
+else Cache miss
+    UserService -> DB: Query users with pagination\nand filtering
+    DB --> UserService: Paginated user list
+    UserService -> Cache: Store in cache
+end
+
+UserService --> UserController: PagedUserResponse
+UserController --> Frontend: 200 OK\n{users, pagination}
+Frontend --> Admin: Display user management table
+
+=== User Management Actions ===
+
+alt Admin wants to ban/unban user
+    Admin -> Frontend: Click ban/unban button
+    Frontend -> UserController: PUT /api/users/{userId}/ban
+    UserController -> UserService: toggleUserBan(userId)
+    UserService -> DB: Update user.banned status
+    UserService -> Cache: Evict user cache
+    UserService -> ActivityService: Log admin action
+    UserService --> UserController: Success response
+    UserController --> Frontend: 200 OK
+    Frontend --> Admin: Update UI (show banned status)
+
+else Admin wants to reset user password
+    Admin -> Frontend: Click "Reset Password"
+    Frontend -> UserController: POST /api/users/{userId}/reset-password
+    UserController -> UserService: adminResetPassword(userId)
+    UserService -> UserService: Generate reset token
+    UserService -> DB: Save reset token
+    UserService -> EmailService: Send reset email
+    UserService --> UserController: Success response
+    UserController --> Frontend: 200 OK
+    Frontend --> Admin: Show "Reset email sent"
+
+else Admin wants to view user details
+    Admin -> Frontend: Click user details
+    Frontend -> UserController: GET /api/users/{userId}
+    UserController -> UserService: getUserDetails(userId)
+    UserService -> Cache: Check user cache
+    UserService -> DB: Get user with reservations
+    UserService --> UserController: Detailed user data
+    UserController --> Frontend: 200 OK
+    Frontend --> Admin: Show user profile modal
+end
+
+== Step 4: Room Management Operations ==
+
+Admin -> Frontend: Click "Manage Rooms" tab
+Frontend -> RoomController: GET /api/rooms
+
+RoomController -> RoomService: getAllRooms()
+RoomService -> Cache: Check rooms cache
+alt Cache hit
+    Cache --> RoomService: Cached rooms data
+else Cache miss
+    RoomService -> DB: Query all rooms
+    DB --> RoomService: Room list
+    RoomService -> Cache: Store in cache
+end
+
+RoomService --> RoomController: List<RoomResponse>
+RoomController --> Frontend: 200 OK\n{rooms}
+Frontend --> Admin: Display room management table
+
+=== Room Management Actions ===
+
+alt Admin wants to create new room
+    Admin -> Frontend: Click "Add Room"
+    Frontend -> Frontend: Show room creation form
+    Admin -> Frontend: Fill room details\n(name, type, capacity, price)
+    Frontend -> RoomController: POST /api/rooms
+    RoomController -> RoomService: createRoom(request)
+    RoomService -> DB: Save new room
+    RoomService -> Cache: Evict rooms cache
+    RoomService -> ActivityService: Log room creation
+    RoomService --> RoomController: Created room
+    RoomController --> Frontend: 201 Created
+    Frontend --> Admin: Update room list
+
+else Admin wants to update room
+    Admin -> Frontend: Click "Edit Room"
+    Frontend -> RoomController: GET /api/rooms/{roomId}
+    RoomController -> RoomService: getRoomById(roomId)
+    RoomService --> RoomController: Room details
+    RoomController --> Frontend: 200 OK
+    Frontend -> Frontend: Pre-fill edit form
+    
+    Admin -> Frontend: Modify room details
+    Frontend -> RoomController: PUT /api/rooms/{roomId}
+    RoomController -> RoomService: updateRoom(roomId, request)
+    RoomService -> DB: Update room
+    RoomService -> Cache: Evict rooms cache
+    RoomService --> RoomController: Updated room
+    RoomController --> Frontend: 200 OK
+    Frontend --> Admin: Update UI
+
+else Admin wants to delete room
+    Admin -> Frontend: Click "Delete Room"
+    Frontend -> Frontend: Show confirmation dialog
+    Admin -> Frontend: Confirm deletion
+    Frontend -> RoomController: DELETE /api/rooms/{roomId}
+    RoomController -> RoomService: deleteRoom(roomId)
+    RoomService -> DB: Check for existing reservations
+    alt Room has active reservations
+        RoomService --> RoomController: ValidationException
+        RoomController --> Frontend: 400 Bad Request
+        Frontend --> Admin: "Cannot delete room with reservations"
+    else Room can be deleted
+        RoomService -> DB: Delete room
+        RoomService -> Cache: Evict rooms cache
+        RoomService --> RoomController: Success
+        RoomController --> Frontend: 200 OK
+        Frontend --> Admin: Remove room from list
+    end
+end
+
+== Step 5: Real-time Monitoring ==
+
+Frontend -> Frontend: Set up polling for real-time data\n(every 30 seconds)
+
+loop Real-time updates
+    Frontend -> AdminController: GET /api/admin/analytics/realtime
+    AdminController -> AdminService: getRealtimeStats()
+    AdminService -> DB: Get current active reservations,\nonline users, etc.
+    AdminService --> AdminController: Real-time data
+    AdminController --> Frontend: 200 OK
+    Frontend -> Frontend: Update dashboard widgets
+    Frontend --> Admin: Show updated metrics
+end
+
+== Step 6: Activity and Audit Logs ==
+
+Admin -> Frontend: Click "Activity Logs" tab
+Frontend -> AdminController: GET /api/admin/activities\n?page=1&size=50
+
+AdminController -> ActivityService: getActivitiesForAdmin(params)
+ActivityService -> DB: Query activity logs\nwith pagination
+DB --> ActivityService: Paginated activities
+ActivityService --> AdminController: Activity list
+AdminController --> Frontend: 200 OK\n{activities, pagination}
+Frontend --> Admin: Display activity log table\n(user actions, system events)
+
+note over Admin, DB: **Admin Dashboard Features:**\n• Real-time analytics and KPIs\n• User management (ban, reset, view)\n• Room management (CRUD operations)\n• Activity monitoring and audit logs\n• Performance metrics and caching\n• Role-based access control\n• Responsive updates
+
+@enduml
