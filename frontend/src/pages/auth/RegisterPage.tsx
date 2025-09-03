@@ -92,7 +92,7 @@ const RegisterPage: React.FC = () => {
           <div className="flex flex-col items-center mb-4">
             <span>
               <img
-                src="/src/assets/images/workreserve-icon-logo1.png"
+                src="/assets/images/workreserve-icon-logo1.png"
                 alt="WorkReserve Logo"
                 className="w-28 h-28 object-contain"
               />
@@ -138,7 +138,7 @@ const RegisterPage: React.FC = () => {
               </li>
             </ul>
             <img
-              src="/src/assets/images/coworking-illustration.jpg"
+              src="/assets/images/coworking-illustration.jpg"
               alt="Workspace"
               className="w-72 mb-6 mt-6 rounded-xl shadow-lg"
             />

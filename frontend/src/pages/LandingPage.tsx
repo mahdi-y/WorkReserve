@@ -276,7 +276,7 @@ const LandingPage: React.FC = () => {
 			<header className="w-full py-6 px-4 flex justify-between items-center bg-white/60 dark:bg-gray-950/60 shadow-lg backdrop-blur-xl z-10 relative border-b border-white/20 dark:border-gray-800/30">
 				<div className="flex items-center space-x-3">
 					<img
-						src="/src/assets/images/workreserve-icon-logo1.png"
+						src="/assets/images/workreserve-icon-logo1.png"
 						alt="WorkReserve Logo"
 						className="w-12 h-12 object-contain"
 					/>
@@ -358,8 +358,8 @@ const LandingPage: React.FC = () => {
 					</div>
 
 					<div className="flex justify-center gap-6 mt-8">
-						<img src="/src/assets/images/landing-hero1.png" alt="Workspace Dashboard" className="w-80 h-52 object-cover rounded-2xl shadow-2xl hidden lg:block border border-white/20 dark:border-gray-700/20" />
-						<img src="/src/assets/images/landing-hero2.png" alt="Mobile App" className="w-80 h-52 object-cover rounded-2xl shadow-2xl hidden lg:block border border-white/20 dark:border-gray-700/20" />
+						<img src="/assets/images/landing-hero1.png" alt="Workspace Dashboard" className="w-80 h-52 object-cover rounded-2xl shadow-2xl hidden lg:block border border-white/20 dark:border-gray-700/20" />
+						<img src="/assets/images/landing-hero2.png" alt="Mobile App" className="w-80 h-52 object-cover rounded-2xl shadow-2xl hidden lg:block border border-white/20 dark:border-gray-700/20" />
 					</div>
 				</div>
 			</section>
@@ -509,7 +509,7 @@ const LandingPage: React.FC = () => {
 					<div className="flex flex-col md:flex-row justify-between items-center">
 						<div className="flex items-center space-x-3 mb-4 md:mb-0">
 							<img
-								src="/src/assets/images/workreserve-icon-logo1.png"
+								src="/assets/images/workreserve-icon-logo1.png"
 								alt="WorkReserve Logo"
 								className="w-8 h-8 object-contain"
 							/>

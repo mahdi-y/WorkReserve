@@ -62,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-center min-w-[2.5rem] h-10 px-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg">
                 <img
                   className="h-8 w-auto max-w-12" 
-                  src="/src/assets/images/workreserve-icon-logo1.png"
+                  src="/assets/images/workreserve-icon-logo1.png"
                   alt="WorkReserve"
                 />
               </div>
@@ -176,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg">
                 <img
                   className="h-6 w-6"
-                  src="/src/assets/images/workreserve-icon-logo1.png"
+                  src="/assets/images/workreserve-icon-logo1.png"
                   alt="WorkReserve"
                 />
               </div>

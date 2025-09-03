@@ -90,7 +90,7 @@ const LoginPage: React.FC = () => {
       <div className="relative flex w-full max-w-7xl h-[1000px] shadow-2xl rounded-2xl bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm overflow-hidden z-10 border border-white/10 dark:border-gray-700/10">
         <div className="hidden md:flex flex-1 flex-col justify-center items-center bg-gradient-to-br from-blue-100/40 to-indigo-100/40 dark:from-blue-900/20 dark:to-indigo-900/20 p-10 h-full backdrop-blur-sm">
           <img
-            src="/src/assets/images/meeting-illustration.jpg"
+            src="/assets/images/meeting-illustration.jpg"
             alt="Workspace"
             className="w-72 mb-6 rounded-xl shadow-lg"
           />
@@ -116,7 +116,7 @@ const LoginPage: React.FC = () => {
           <div className="flex flex-col items-center text-center">
             <span>
               <img
-                src="/src/assets/images/workreserve-icon-logo1.png"
+                src="/assets/images/workreserve-icon-logo1.png"
                 alt="WorkReserve Logo"
                 className="w-32 h-32 object-contain"
               />
