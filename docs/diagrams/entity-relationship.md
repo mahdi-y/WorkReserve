@@ -1,11 +1,11 @@
 erDiagram
-    User ||--o{ Reservation : "1:N\nuser creates\nreservations"
-    Room ||--o{ TimeSlot : "1:N\nroom has\ntime slots"
-    TimeSlot ||--o{ Reservation : "1:N\ntime slot can be\nreserved multiple times\n(different users/dates)"
-    User }o--|| Role : "N:1\nuser has role"
-    Room }o--|| RoomType : "N:1\nroom has type"
-    Reservation }o--|| ReservationStatus : "N:1\nreservation has status"
-    Reservation ||--o| Payment : "1:1\nreservation\nhas payment"
+    User ||--o{ Reservation : "1:N user creates reservations"
+    Room ||--o{ TimeSlot : "1:N room has time slots"
+    TimeSlot ||--o{ Reservation : "1:N time slot can be reserved multiple times (different users/dates)"
+    User }o--|| Role : "N:1 user has role"
+    Room }o--|| RoomType : "N:1 room has type"
+    Reservation }o--|| ReservationStatus : "N:1 reservation has status"
+    Reservation ||--o| Payment : "1:1 reservation has payment"
 
     User {
         Long id PK
