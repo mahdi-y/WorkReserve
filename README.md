@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white&color=#3DA638" alt="License">
 </p>
 
-[View Full Report (Rapport de Stage)](Rapport.pdf) | [Live Demo](https://workreserve-frontend.onrender.com) | [Contact](#contributing)
+[Live Demo](https://workreserve-frontend.onrender.com) | [Contact](#contributing)
 
 </div>
 
